@@ -1,9 +1,9 @@
 # Module manifest for module 'functions'
 
 @{
-  ModuleVersion = '2.0.0'
+  ModuleVersion = '2.1.0'
   Author = 'Tealk'
-  Description = 'PowerShell-Modul für die Paketierung von Anwendungen für Microsoft Intune.'
+  Description = 'PowerShell module for packaging applications for Microsoft Intune.'
 
   FunctionsToExport = @(
       'Get-Folder',
@@ -15,7 +15,8 @@
       'Invoke-TestIntune',
       'Invoke-TestApp',
       'Invoke-TestAppAsSystem',
-      'Remove-OldIntuneWinFiles'
+      'Remove-OldIntuneWinFiles',
+      'Invoke-PSAppDeployToolkit'
   )
 
   # Script module or binary module file associated with this manifest.
@@ -55,7 +56,6 @@
   # ReleaseNotes = 'ReleaseNotes.md'
 
   # Informationen über den Lizenztyp und die URL (optional)
-  # LicenseUri = 'https://example.com/licenses'
-  # ProjectUri = 'https://github.com/username/repo'
-  # IconUri = 'https://example.com/icon.png'
+  # LicenseUri = 'https://github.com/Tealk/Intune-Win32-packaging/blob/master/LICENSE'
+  # ProjectUri = 'https://github.com/Tealk/Intune-Win32-packaging'
 }

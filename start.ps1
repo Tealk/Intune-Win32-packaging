@@ -7,20 +7,22 @@ param (
     [switch]$tu,
     [switch]$p,
     [switch]$pm,
-    [switch]$c
+    [switch]$c,
+    [switch]$udp
 )
 
 Import-Module -Name ".\functions.psd1"
 
 function Show-HelpMessage {
-    Write-Host "Es wurde keine gültige Option angegeben. Verwende den Schalter '-t' oder '-p'."
-    Write-Host "Verfügbarer Schalter:"
-    Write-Host "-t  zum testen mit Adminrechten"
-    Write-Host "-ts zum testen mit System account"
-    Write-Host "-tu Vergleicht Paketnamen/Ordnernamen mit denen von Intune"
-    Write-Host "-p  zum paketieren eines Programms"
-    Write-Host "-pm zum paketieren aller Programme"
-    Write-Host "-c  löscht alle .intunewin Dateien die älter als 30 Tage sind"
+    Write-Host "No valid option was specified."
+    Write-Host "Available switch:"
+    Write-Host "-t for testing with admin rights"
+    Write-Host "-ts for testing with system account"
+    Write-Host "-tu Compares package names/folder names with those of Intune"
+    Write-Host "-p for packaging a program"
+    Write-Host "-pm to package all programs"
+    Write-Host "-c deletes all .intunewin files older than 30 days"
+    Write-Host "-udp  Updates the PSAppDeployToolkit files"
 }
 
 if ($t) {
@@ -33,11 +35,11 @@ elseif ($tu) {
     Invoke-TestIntune
 }
 elseif ($p) {
-    git submodule update --remote --recursive
+#    git submodule update --remote --recursive
     Invoke-Paketieren
 }
 elseif ($pm) {
-    git submodule update --remote --recursive
+#    git submodule update --remote --recursive
     Invoke-PaketierenAll
 }
 elseif ($h) {
@@ -45,6 +47,9 @@ elseif ($h) {
 }
 elseif ($c) {
     Remove-OldIntuneWinFiles
+}
+elseif ($udp) {
+    Invoke-PSAppDeployToolkit
 }
 else {
     Show-HelpMessage

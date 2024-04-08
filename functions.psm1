@@ -1,32 +1,32 @@
 <#
 .SYNOPSIS
-PowerShell-Modul für die Paketierung von Anwendungen für Microsoft Intune.
+PowerShell module for packaging applications for Microsoft Intune.
 
 .DESCRIPTION
-Dieses PowerShell-Modul bietet Funktionen zum Paketieren von Anwendungen für Microsoft Intune. Es ermöglicht das Erstellen von IntuneWin-Paketen (.intunewin) für die Bereitstellung von Anwendungen in Microsoft Intune.
+This PowerShell module provides functions for packaging applications for Microsoft Intune. It enables the creation of IntuneWin packages (.intunewin) for the deployment of applications in Microsoft Intune.
 
 .FUNCTIONS
-Folgende Funktionen sind enthalten:
-- Get-Folder: Zeigt einen Ordnerdialog zur Auswahl eines Verzeichnisses an.
-- Get-File: Zeigt einen Dateidialog zur Auswahl einer Datei an.
-- Invoke-Paketieren: Erstellt ein IntuneWin-Paket aus dem Quellordner.
-- Invoke-PaketierenAll: Erstellt IntuneWin-Pakete für alle Unterordner im Quellverzeichnis.
-- Invoke-MSIntuneGraph: Stellt eine Verbindung zu Microsoft Intune her und installiert das erforderliche Modul.
-- Invoke-Upload: Lädt das IntuneWin-Paket in Microsoft Intune hoch.
-- Invoke-TestIntune: Testet die Ordnernamen gegen die Intune Paketnamen
-- Invoke-TestApp: Startet die Anwendungspaketierung in einer PowerShell-Konsole.
-- Remove-OldIntuneWinFiles: Löscht alte IntuneWin-Dateien aus einem Verzeichnis.
+The following functions are included:
+- Get-Folder: Displays a folder dialog for selecting a directory.
+- Get-File: Displays a file dialog for selecting a file.
+- Invoke-Package: Creates an IntuneWin package from the source folder.
+- Invoke-PackageAll: Creates IntuneWin packages for all subfolders in the source directory.
+- Invoke-MSIntuneGraph: Establishes a connection to Microsoft Intune and installs the required module.
+- Invoke-Upload: Uploads the IntuneWin package to Microsoft Intune.
+- Invoke-TestIntune: Tests the folder names against the Intune package names
+- Invoke-TestApp: Starts the application packaging in a PowerShell console.
+- Remove-OldIntuneWinFiles: Deletes old IntuneWin files from a directory.
+- Invoke-PSAppDeployToolkit: Updates the PSAppDeployToolkit files.
 
 .PARAMETER initialDirectory
-Der optionale Startpfad für die Ordner- oder Dateiauswahl in den entsprechenden Funktionen.
+The optional start path for the folder or file selection in the corresponding functions.
 
 .NOTES
-Dieses Modul erfordert das Modul 'IntuneWin32App' zur Interaktion mit Microsoft Intune.
-Das Modul 'IntuneWin32App' wird bei Bedarf automatisch installiert.
-Verwenden Sie die Funktionen, um IntuneWin-Pakete vorzubereiten und hochzuladen.
+This module requires the 'IntuneWin32App' module to interact with Microsoft Intune.
+The 'IntuneWin32App' module is installed automatically if required.
+Use the functions to prepare and upload IntuneWin packages.
 #>
 
-$TenantID = "name.onmicrosoft.com"
 
 function Get-Folder($initialDirectory) {
   [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
@@ -39,7 +39,7 @@ function Get-Folder($initialDirectory) {
     return $FolderBrowserDialog.SelectedPath
   }
   else {
-    Write-Host "Kein Ordner ausgewählt. Das Skript wird beendet."
+    Write-Host "No folder selected. The script closes."
     exit 1
   }
 }
@@ -55,7 +55,7 @@ function Get-File($initialDirectory) {
     return $OpenFileDialog.SelectedPath
   }
   else {
-    Write-Host "Kein Ordner ausgewählt. Das Skript wird beendet."
+    Write-Host "No File selected. The script closes."
     exit 1
   }
 }
@@ -79,23 +79,26 @@ function Invoke-Paketieren {
       }
       try {
         if ((Test-Path -Path "$FolderAPP\$File.ps1" -PathType Leaf) -and (Test-Path -Path "$FolderAPP\$File.exe" -PathType Leaf)) {
-          Write-Host "Die Paketierung wird gestartet..."
+          Write-Host "Packaging is being started..."
           $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "$FolderAPP" -s "$FileAPP" -o "$FolderOUT" -q)
           if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
-            Write-Host "und wurde erfolgreich ausgeführt." -ForegroundColor Green
+            Write-Host "and was executed successfully." -ForegroundColor Green
             Invoke-Upload
-          } else {
-            throw "Die Paketierung wurde nicht erfolgreich ausgeführt."
           }
-        } else {
-          throw "Die erforderlichen Dateien existieren nicht."
+          else {
+            throw "The packaging was not executed successfully."
+          }
         }
-      } catch {
-        Write-Error "Fehler beim Paketieren von $appFoldername $_"
+        else {
+          throw "The required files do not exist."
+        }
+      }
+      catch {
+        Write-Error "Error while packaging $appFoldername $_"
       }
     }
     else {
-      Write-Host -NoNewLine 'Keine Deploy-Application.exe gefunden. Abbruch.';
+      Write-Host -NoNewLine 'No Deploy-Application.exe found. Abort.';
       $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
     }
   }
@@ -121,19 +124,22 @@ function Invoke-PaketierenAll {
       }
       try {
         if ((Test-Path -Path "$FolderAPP\$File.ps1" -PathType Leaf) -and (Test-Path -Path "$FolderAPP\$File.exe" -PathType Leaf)) {
-          Write-Host "Die Paketierung wird gestartet..."
+          Write-Host "Packaging is being started..."
           $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "$FolderAPP" -s "$FileAPP" -o "$FolderOUT" -q)
           if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
-            Write-Host "und wurde erfolgreich ausgeführt." -ForegroundColor Green
+            Write-Host "and was executed successfully." -ForegroundColor Green
             Invoke-Upload
-          } else {
-            throw "Die Paketierung wurde nicht erfolgreich ausgeführt."
           }
-        } else {
-          throw "Die erforderlichen Dateien existieren nicht."
+          else {
+            throw "The packaging was not executed successfully."
+          }
         }
-      } catch {
-        Write-Error "Fehler beim Paketieren von $appFoldername $_"
+        else {
+          throw "The required files do not exist."
+        }
+      }
+      catch {
+        Write-Error "Error while packaging $appFoldername $_"
       }
       Write-Host "=========="
     }
@@ -147,10 +153,10 @@ function Invoke-MSIntuneGraph {
   }
   if (-not $global:MSIntuneGraphToken) {
     if (-not (Get-Module -ListAvailable | Where-Object { $_.Name -eq "IntuneWin32App" })) {
-      Write-Host "Das Modul IntuneWin32App ist nicht installiert. Es wird jetzt installiert..."
+      Write-Host "The IntuneWin32App module is not installed. It is being installed now..."
       Install-Module -Name "IntuneWin32App" -AcceptLicense -Force
-  }
-    Connect-MSIntuneGraph -TenantID "$TenantID"
+    }
+    Connect-MSIntuneGraph -TenantID "mmmgroup.onmicrosoft.com"
     $global:MSIntuneGraphToken = $true
   }
 }
@@ -161,19 +167,20 @@ function Invoke-Upload {
   $appFoldername = (Split-Path $FolderAPP -Leaf)
   $PackID = (Get-IntuneWin32App -DisplayName "$appFoldername").Id
   if ([string]::IsNullOrEmpty($PackID)) {
-    Write-Host ".intunewin Datei wurde nicht gefunden."
+    Write-Host "$appFoldername not available in Intune."
   }
   else {
     Import-Module $FolderAPP\Deploy-Application.ps1 2>&1
     try {
-      Write-Host "Wird hochgeladen..."
+      Write-Host "Uploading..."
       $null = (Update-IntuneWin32AppPackageFile -ID $PackID -FilePath $FileOUT)
       $null = (Set-IntuneWin32App -ID $PackID -AppVersion $appVersion)
-
-      Write-Host "und wurde erfolgreich beendet." -ForegroundColor DarkGreen
-      Write-Host "Es muss noch die Erkennungsregel angepasst werden!" -ForegroundColor Magenta
-    } catch {
-      Write-Error "Fehler beim Hochladen von $appFoldername $_"
+      
+      Write-Host "and was successfully completed." -ForegroundColor DarkGreen
+      Write-Host "The detection rule still needs to be adjusted!" -ForegroundColor Magenta
+    }
+    catch {
+      Write-Error "Error uploading $appFoldername $_"
     }
   }
 }
@@ -190,26 +197,26 @@ function Invoke-TestIntune {
       $appName = (Split-Path $FolderAPP -Leaf)
       $PackName = Get-IntuneWin32App -DisplayName "$appName"
       if ([string]::IsNullOrEmpty($PackName)) {
-        Write-Host "$appName nicht gefunden."
+        Write-Host "$appName not found."
       }
       else {
-        Write-Host "$appName wurde gefunden."
+        Write-Host "$appName was found."
       }
     }
   }
 }
 
 function Invoke-TestApp {
-  $ordnerPfad = Get-Folder
-  $deployExePfad = Join-Path -Path $ordnerPfad -ChildPath "Deploy-Application.ps1"
+  $folderPath = Get-Folder
+  $deployExePfad = Join-Path -Path $folderPath -ChildPath "Deploy-Application.ps1"
   $command = "${deployExePfad}"
   Start-Process pwsh -ArgumentList "-NoExit", "$command" -Verb RunAs
 }
 
 function Invoke-TestAppAsSystem {
   #broken
-  $ordnerPfad = Get-Folder
-  $deployExePfad = Join-Path -Path $ordnerPfad -ChildPath "Deploy-Application.exe"
+  $folderPath = Get-Folder
+  $deployExePfad = Join-Path -Path $folderPath -ChildPath "Deploy-Application.exe"
   $command = "psexec -s -i ${deployExePfad}"
   Start-Process cmd.exe -ArgumentList "/K $command" -Verb RunAs
 }
@@ -223,11 +230,30 @@ function Remove-OldIntuneWinFiles {
     foreach ($file in $intuneWinFiles) {
       try {
         Remove-Item -Path $file.FullName -Force
-        Write-Host "Die Datei '$($file.FullName)' wurde gelöscht."
+        Write-Host "The file '$($file.FullName)' has been deleted."
       }
       catch {
-        Write-Host "Fehler beim Löschen der Datei '$($file.FullName)': $_" -ForegroundColor Red
+        Write-Host "Error deleting file '$($file.FullName)': $_" -ForegroundColor Red
       }
+    }
+  }
+}
+
+function Invoke-PSAppDeployToolkit {
+  $curDir = Get-Location
+  Write-Host "Select the folder in which the new PSAppDeployToolkit files are located."
+  $NewToolkitPath = Get-Folder "C:\Users\$env:USERNAME\Downloads"
+  Write-Host "Select the folder in which the packages to be updated are located."
+  $DeployPath = Get-Folder "$curDir\IN"
+  $NewDeployApplication = Join-Path -Path $NewToolkitPath -ChildPath "Deploy-Application.exe"
+  $NewAppDeployToolkit = Join-Path -Path $NewToolkitPath -ChildPath "AppDeployToolkit"
+  $DeployChildFolder = Get-ChildItem -Path $DeployPath -Directory -Recurse
+  foreach ($ChildItem in $DeployChildFolder) {
+    $DeployPfad = Join-Path -Path $ChildItem.FullName -ChildPath "Deploy-Application.exe"
+
+    if (Test-Path $DeployPfad -PathType Leaf) {
+      Copy-Item -Path $NewDeployApplication -Destination $ChildItem.FullName -Force
+      Copy-Item -Path $NewAppDeployToolkit -Destination $ChildItem.FullName -Recurse -Force
     }
   }
 }
