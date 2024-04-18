@@ -37,6 +37,7 @@ Try {
     [String]$CloseApps = "PROZESSNAME"
     [String]$HKLMIntune = "HKLM:\SOFTWARE\Microsoft\Intune"
     [String]$HKCUIntune = "HKCU:\SOFTWARE\Microsoft\Intune"
+    [String]$uuid = ""
     [String]$appArch = ''
     [String]$appLang = ''
     [String]$appRevision = '01'
@@ -131,8 +132,6 @@ Try {
         if (-not (Test-Path "$HKLMIntune")) {
             New-Item -Path "$HKLMIntune" -Force
         }
-
-
         ##*===============================================
         ##* INSTALLATION
         ##*===============================================
