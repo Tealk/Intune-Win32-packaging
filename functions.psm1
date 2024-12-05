@@ -63,6 +63,28 @@ function Get-File(${initialDirectory}) {
   }
 }
 
+function Invoke-CompilePackage {
+  param (
+      [string]$appName,
+      [string]$appPath
+  )
+
+  $curDir = Get-Location
+  $templatePath = "${curDir}\IN\_template"
+  $tempPackagePath = Join-Path -Path $env:TEMP -ChildPath "TempPackage_${appName}"
+
+  if (Test-Path ${tempPackagePath}) {
+    Remove-Item -Path ${tempPackagePath} -Recurse -Force
+  }
+  New-Item -Path ${tempPackagePath} -ItemType Directory | Out-Null
+
+  Copy-Item -Path "${templatePath}\*" -Destination ${tempPackagePath} -Recurse
+
+  Copy-Item -Path "${appPath}\*" -Destination ${tempPackagePath} -Recurse -Force
+
+  return ${tempPackagePath}
+}
+
 function Invoke-Paketieren {
   $curDir = Get-Location
   $FolderAPP = Get-Folder "${curDir}\IN\Standard"
@@ -82,9 +104,20 @@ function Invoke-Paketieren {
       Rename-Item -Path "${FileOUT}" -NewName "${Version}.intunewin"
     }
     try {
+      Write-Host "Compile is being started..."
+      $tempFolderAPP = $(Invoke-CompilePackage -appName "${appFoldername}" -appPath "${FolderAPP}")
+    }
+    catch {
+      Write-Error "Error while compiling ${appFoldername} $_"
+    }
+    finally {
+      $FilePs1 = "${tempFolderAPP}\${File}.ps1"
+      $FileExe = "${tempFolderAPP}\${File}.exe"
+    }
+    try {
       if ((Test-Path -Path "${FilePs1}" -PathType Leaf) -and (Test-Path -Path "${FileExe}" -PathType Leaf)) {
         Write-Host "Packaging is being started..."
-        $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "${FolderAPP}" -s "${FileExe}" -o "${FolderOUT}" -q)
+        $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "${tempFolderAPP}" -s "${FileExe}" -o "${FolderOUT}" -q)
         if (Test-Path -Path ${FileOUT} -ErrorAction Ignore) {
           Write-Host "and was executed successfully." -ForegroundColor Green
           if ( -not [string]::IsNullOrEmpty(${uuid})) {
