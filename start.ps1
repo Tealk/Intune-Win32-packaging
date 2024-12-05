@@ -1,4 +1,5 @@
 #Requires -Version 7
+#Requires -Module IntuneWin32App
 
 param (
     [switch]$h,

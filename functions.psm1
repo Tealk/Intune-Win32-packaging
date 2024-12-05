@@ -70,6 +70,7 @@ function Invoke-Paketieren {
   $FolderOUT = $FolderAPP -creplace 'IN', 'OUT'
   $FileOUT = "$FolderOUT\$File.intunewin"
   $Version = Get-Date -Format "MM_dd_yy_HH_mm"
+  Import-Module $FilePs1 2>&1
 
   if ($FolderAPP -notmatch 'template') {
     Write-Host "$appFoldername"
@@ -83,7 +84,12 @@ function Invoke-Paketieren {
         $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "$FolderAPP" -s "$FileExe" -o "$FolderOUT" -q)
         if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
           Write-Host "and was executed successfully." -ForegroundColor Green
-          Invoke-Upload
+          if ( -not [string]::IsNullOrEmpty($uuid)) {
+            Invoke-Upload
+          }
+          else {
+            throw "$appName has no UUID."
+          }
         }
         else {
           throw "The packaging was not executed successfully."
@@ -120,7 +126,7 @@ function Invoke-PaketierenAll {
       }
       try {
         if ((Test-Path -Path "$FilePs1" -PathType Leaf) -and (Test-Path -Path "$FileExe" -PathType Leaf)) {
-          if ([string]::IsNullOrEmpty($uuid)) {
+          if ( -not [string]::IsNullOrEmpty($uuid)) {
             Write-Host "Packaging is being started..."
             $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "$FolderAPP" -s "$FileExe" -o "$FolderOUT" -q)
             if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
@@ -157,7 +163,7 @@ function Invoke-MSIntuneGraph {
       Write-Host "The IntuneWin32App module is not installed. It is being installed now..."
       Install-Module -Name "IntuneWin32App" -AcceptLicense -Force
     }
-    Connect-MSIntuneGraph -TenantID "mmmgroup.onmicrosoft.com"
+        Connect-MSIntuneGraph -TenantID "domain.onmicrosoft.com"
     $global:MSIntuneGraphToken = $true
   }
 }
@@ -174,7 +180,7 @@ function Invoke-Upload {
       Write-Host "Uploading started..."
       $null = (Update-IntuneWin32AppPackageFile -ID $uuid -FilePath $FileOUT)
       $null = (Set-IntuneWin32App -ID $uuid -AppVersion $appVersion)
-      
+
       Write-Host "and was successfully completed." -ForegroundColor Green
       Write-Host "The detection rule still needs to be adjusted!" -ForegroundColor Magenta
     }
@@ -214,9 +220,8 @@ function Invoke-TestApp {
 
 function Invoke-TestAppAsSystem {
   #broken
-  $folderPath = Get-Folder
-  $deployExePfad = Join-Path -Path $folderPath -ChildPath "Deploy-Application.exe"
-  $command = "psexec -s -i ${deployExePfad}"
+  $command = "psexec -s -i cmd.exe"
+  # then execute 'ServiceUI.exe -Process:explorer.exe Deploy-Application.exe'
   Start-Process cmd.exe -ArgumentList "/K $command" -Verb RunAs
 }
 
