@@ -31,14 +31,14 @@ $TenantID = "domain.onmicrosoft.com"
 $ClientID = "00000000-x000-0000-x0x0-00x000000000"
 $ClientSecret = "x0x0x~0xxxxxxxx.0-xxxxZ0xxxxx-0xxxx-xxxx"
 
-function Get-Folder($initialDirectory) {
+function Get-Folder(${initialDirectory}) {
   [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
   $FolderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
   $FolderBrowserDialog.RootFolder = 'MyComputer'
-  if ($initialDirectory) { $FolderBrowserDialog.SelectedPath = $initialDirectory }
+  if (${initialDirectory}) { $FolderBrowserDialog.SelectedPath = ${initialDirectory} }
   $result = $FolderBrowserDialog.ShowDialog()
 
-  if ($result -eq 'OK') {
+  if (${result} -eq 'OK') {
     return $FolderBrowserDialog.SelectedPath
   }
   else {
@@ -47,14 +47,14 @@ function Get-Folder($initialDirectory) {
   }
 }
 
-function Get-File($initialDirectory) {
+function Get-File(${initialDirectory}) {
   [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
   $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
-  if ($initialDirectory) { $OpenFileDialog.initialDirectory = $initialDirectory }
+  if (${initialDirectory}) { $OpenFileDialog.initialDirectory = ${initialDirectory} }
   $OpenFileDialog.filter = 'All files (*.*)|*.*'
   $result = $OpenFileDialog.ShowDialog()
 
-  if ($result -eq 'OK') {
+  if (${result} -eq 'OK') {
     return $OpenFileDialog.SelectedPath
   }
   else {
@@ -65,33 +65,33 @@ function Get-File($initialDirectory) {
 
 function Invoke-Paketieren {
   $curDir = Get-Location
-  $FolderAPP = Get-Folder "$curDir\IN\Standard"
+  $FolderAPP = Get-Folder "${curDir}\IN\Standard"
   $File = "Deploy-Application"
-  $appFoldername = (Split-Path $FolderAPP -Leaf)
-  $FilePs1 = "$FolderAPP\$File.ps1"
-  $FileExe = "$FolderAPP\$File.exe"
-  $FolderOUT = $FolderAPP -creplace 'IN', 'OUT'
-  $FileOUT = "$FolderOUT\$File.intunewin"
+  $appFoldername = (Split-Path ${FolderAPP} -Leaf)
+  $FilePs1 = "${FolderAPP}\${File}.ps1"
+  $FileExe = "${FolderAPP}\${File}.exe"
+  $FolderOUT = ${FolderAPP} -creplace 'IN', 'OUT'
+  $FileOUT = "${FolderOUT}\${File}.intunewin"
   $Version = Get-Date -Format "MM_dd_yy_HH_mm"
-  Import-Module $FilePs1 2>&1
+  Import-Module ${FilePs1} 2>&1
 
-  if ($FolderAPP -notmatch 'template') {
-    Write-Host "$appFoldername"
+  if (${FolderAPP} -notmatch 'template') {
+    Write-Host "${appFoldername}"
     Write-Host "=========="
-    if (Get-Item -Path $FileOUT -ErrorAction Ignore) {
-      Rename-Item -Path "$FileOUT" -NewName "$Version.intunewin"
+    if (Get-Item -Path ${FileOUT} -ErrorAction Ignore) {
+      Rename-Item -Path "${FileOUT}" -NewName "${Version}.intunewin"
     }
     try {
-      if ((Test-Path -Path "$FilePs1" -PathType Leaf) -and (Test-Path -Path "$FileExe" -PathType Leaf)) {
+      if ((Test-Path -Path "${FilePs1}" -PathType Leaf) -and (Test-Path -Path "${FileExe}" -PathType Leaf)) {
         Write-Host "Packaging is being started..."
-        $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "$FolderAPP" -s "$FileExe" -o "$FolderOUT" -q)
-        if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
+        $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "${FolderAPP}" -s "${FileExe}" -o "${FolderOUT}" -q)
+        if (Test-Path -Path ${FileOUT} -ErrorAction Ignore) {
           Write-Host "and was executed successfully." -ForegroundColor Green
-          if ( -not [string]::IsNullOrEmpty($uuid)) {
+          if ( -not [string]::IsNullOrEmpty(${uuid})) {
             Invoke-Upload
           }
           else {
-            throw "$appName has no UUID."
+            throw "${appName} has no UUID."
           }
         }
         else {
@@ -103,36 +103,36 @@ function Invoke-Paketieren {
       }
     }
     catch {
-      Write-Error "Error while packaging $appFoldername $_"
+      Write-Error "Error while packaging ${appFoldername} $_"
     }
   }
 }
 
 function Invoke-PaketierenAll {
   $curDir = Get-Location
-  $FolderIN = Get-Folder "$curDir\IN\Standard"
-  $FolderAPPs = Get-ChildItem -Path $FolderIN -Directory
+  $FolderIN = Get-Folder "${curDir}\IN\Standard"
+  $FolderAPPs = Get-ChildItem -Path ${FolderIN} -Directory
   $File = "Deploy-Application"
   $Version = Get-Date -Format "yy_MM_dd_HH_mm"
 
-  foreach ($FolderAPP in $FolderAPPs) {
-    $FilePs1 = "$FolderAPP\$File.ps1"
-    $FileExe = "$FolderAPP\$File.exe"
-    $FolderOUT = $FolderAPP -creplace 'IN', 'OUT'
-    $FileOUT = "$FolderOUT\$File.intunewin"
-    Import-Module $FilePs1 2>&1
-    if ($FolderAPP -notmatch 'template') {
-      Write-Host "$appName"
+  foreach (${FolderAPP} in ${FolderAPPs}) {
+    $FilePs1 = "${FolderAPP}\${File}.ps1"
+    $FileExe = "${FolderAPP}\${File}.exe"
+    $FolderOUT = ${FolderAPP} -creplace 'IN', 'OUT'
+    $FileOUT = "${FolderOUT}\${File}.intunewin"
+    Import-Module ${FilePs1} 2>&1
+    if (${FolderAPP} -notmatch 'template') {
+      Write-Host "${appName}"
       Write-Host "=========="
-      if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
-        Rename-Item -Path "$FileOUT" -NewName "$Version.intunewin"
+      if (Test-Path -Path ${FileOUT} -ErrorAction Ignore) {
+        Rename-Item -Path "${FileOUT}" -NewName "${Version}.intunewin"
       }
       try {
-        if ((Test-Path -Path "$FilePs1" -PathType Leaf) -and (Test-Path -Path "$FileExe" -PathType Leaf)) {
-          if ( -not [string]::IsNullOrEmpty($uuid)) {
+        if ((Test-Path -Path "${FilePs1}" -PathType Leaf) -and (Test-Path -Path "${FileExe}" -PathType Leaf)) {
+          if ( -not [string]::IsNullOrEmpty(${uuid})) {
             Write-Host "Packaging is being started..."
-            $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "$FolderAPP" -s "$FileExe" -o "$FolderOUT" -q)
-            if (Test-Path -Path $FileOUT -ErrorAction Ignore) {
+            $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "${FolderAPP}" -s "${FileExe}" -o "${FolderOUT}" -q)
+            if (Test-Path -Path ${FileOUT} -ErrorAction Ignore) {
               Write-Host "and was executed successfully." -ForegroundColor Green
               Invoke-Upload
             }
@@ -141,7 +141,7 @@ function Invoke-PaketierenAll {
             }
           }
           else {
-            throw "$appName has no UUID."
+            throw "${appName} has no UUID."
           }
         }
         else {
@@ -149,7 +149,7 @@ function Invoke-PaketierenAll {
         }
       }
       catch {
-        Write-Error "Error while packaging $appName $_"
+        Write-Error "Error while packaging ${appName} $_"
       }
       Write-Host "=========="
     }
@@ -158,7 +158,7 @@ function Invoke-PaketierenAll {
 
 function Invoke-MSIntuneGraph {
   $TokenLifeTime = ($Global:AuthenticationHeader.ExpiresOn - (Get-Date).ToUniversalTime()).TotalMinutes
-  if ($TokenLifeTime -le 0) {
+  if (${TokenLifeTime} -le 0) {
     $global:MSIntuneGraphToken = $false
   }
   if (-not $global:MSIntuneGraphToken) {
@@ -173,42 +173,42 @@ function Invoke-MSIntuneGraph {
 
 function Invoke-Upload {
   Invoke-MSIntuneGraph
-  Import-Module $FolderAPP\Deploy-Application.ps1 2>&1
+  Import-Module ${FolderAPP}\Deploy-Application.ps1 2>&1
 
-  if ([string]::IsNullOrEmpty($uuid)) {
-    Write-Host "$appFoldername not available in Intune."
+  if ([string]::IsNullOrEmpty(${uuid})) {
+    Write-Host "${appFoldername} not available in Intune."
   }
   else {
     try {
       Write-Host "Uploading started..."
-      $null = (Update-IntuneWin32AppPackageFile -ID $uuid -FilePath $FileOUT)
-      $null = (Set-IntuneWin32App -ID $uuid -AppVersion $appVersion)
+      $null = (Update-IntuneWin32AppPackageFile -ID ${uuid} -FilePath ${FileOUT})
+      $null = (Set-IntuneWin32App -ID ${uuid} -AppVersion ${appVersion})
 
       Write-Host "and was successfully completed." -ForegroundColor Green
       Write-Host "The detection rule still needs to be adjusted!" -ForegroundColor Magenta
     }
     catch {
-      Write-Error "Error uploading $appFoldername $_"
+      Write-Error "Error uploading ${appFoldername} $_"
     }
   }
 }
 
 function Invoke-TestIntune {
   $curDir = Get-Location
-  $FolderIN = Get-Folder "$curDir\IN\Standard"
-  $FolderAPPs = Get-ChildItem -Path $FolderIN -Directory
+  $FolderIN = Get-Folder "${curDir}\IN\Standard"
+  $FolderAPPs = Get-ChildItem -Path ${FolderIN} -Directory
   Invoke-MSIntuneGraph
 
-  foreach ($FolderAPP in $FolderAPPs) {
-    $FileAPP = "$FolderAPP\Deploy-Application.ps1"
-    if (Get-Item -Path $FileAPP -ErrorAction Ignore) {
-      $appName = (Split-Path $FolderAPP -Leaf)
-      $PackName = Get-IntuneWin32App -DisplayName "$appName"
-      if ([string]::IsNullOrEmpty($PackName)) {
-        Write-Host "$appName not found."
+  foreach (${FolderAPP} in ${FolderAPPs}) {
+    $FileAPP = "${FolderAPP}\Deploy-Application.ps1"
+    if (Get-Item -Path ${FileAPP} -ErrorAction Ignore) {
+      $appName = (Split-Path ${FolderAPP} -Leaf)
+      $PackName = Get-IntuneWin32App -DisplayName "${appName}"
+      if ([string]::IsNullOrEmpty(${PackName})) {
+        Write-Host "${appName} not found."
       }
       else {
-        Write-Host "$appName was found."
+        Write-Host "${appName} was found."
       }
     }
   }
@@ -216,25 +216,25 @@ function Invoke-TestIntune {
 
 function Invoke-TestApp {
   $folderPath = Get-Folder
-  $deployExePfad = Join-Path -Path $folderPath -ChildPath "Deploy-Application.ps1"
+  $deployExePfad = Join-Path -Path ${folderPath} -ChildPath "Deploy-Application.ps1"
   $command = "${deployExePfad}"
-  Start-Process pwsh -ArgumentList "-NoExit", "$command" -Verb RunAs
+  Start-Process pwsh -ArgumentList "-NoExit", "${command}" -Verb RunAs
 }
 
 function Invoke-TestAppAsSystem {
   #broken
   $command = "psexec -s -i cmd.exe"
   # then execute 'ServiceUI.exe -Process:explorer.exe Deploy-Application.exe'
-  Start-Process cmd.exe -ArgumentList "/K $command" -Verb RunAs
+  Start-Process cmd.exe -ArgumentList "/K ${command}" -Verb RunAs
 }
 
 function Remove-OldIntuneWinFiles {
   $targetFolder = "C:\_Intune\OUT\"
   $daysToKeep = 30
   $currentDate = Get-Date
-  $intuneWinFiles = Get-ChildItem -Path $targetFolder -Recurse -Filter "*.intunewin" | Where-Object { $_.LastWriteTime -lt ($currentDate.AddDays(-$daysToKeep)) -and $_.Name -ne "install.intunewin" -and $_.Name -ne "Deploy-Application.intunewin" }
-  if ($intuneWinFiles) {
-    foreach ($file in $intuneWinFiles) {
+  $intuneWinFiles = Get-ChildItem -Path ${targetFolder} -Recurse -Filter "*.intunewin" | Where-Object { $_.LastWriteTime -lt ($currentDate.AddDays(-$daysToKeep)) -and $_.Name -ne "install.intunewin" -and $_.Name -ne "Deploy-Application.intunewin" }
+  if (${intuneWinFiles}) {
+    foreach ($file in ${intuneWinFiles}) {
       try {
         Remove-Item -Path $file.FullName -Force
         Write-Host "The file '$($file.FullName)' has been deleted."
@@ -251,16 +251,16 @@ function Invoke-PSAppDeployToolkit {
   Write-Host "Select the folder in which the new PSAppDeployToolkit files are located."
   $NewToolkitPath = Get-Folder "C:\Users\$env:USERNAME\Downloads"
   Write-Host "Select the folder in which the packages to be updated are located."
-  $DeployPath = Get-Folder "$curDir\IN"
-  $NewDeployApplication = Join-Path -Path $NewToolkitPath -ChildPath "Deploy-Application.exe"
-  $NewAppDeployToolkit = Join-Path -Path $NewToolkitPath -ChildPath "AppDeployToolkit"
-  $DeployChildFolder = Get-ChildItem -Path $DeployPath -Directory -Recurse
-  foreach ($ChildItem in $DeployChildFolder) {
+  $DeployPath = Get-Folder "${curDir}\IN"
+  $NewDeployApplication = Join-Path -Path ${NewToolkitPath} -ChildPath "Deploy-Application.exe"
+  $NewAppDeployToolkit = Join-Path -Path ${NewToolkitPath} -ChildPath "AppDeployToolkit"
+  $DeployChildFolder = Get-ChildItem -Path ${DeployPath} -Directory -Recurse
+  foreach (${ChildItem} in ${DeployChildFolder}) {
     $DeployPfad = Join-Path -Path $ChildItem.FullName -ChildPath "Deploy-Application.exe"
 
-    if (Test-Path $DeployPfad -PathType Leaf) {
-      Copy-Item -Path $NewDeployApplication -Destination $ChildItem.FullName -Force
-      Copy-Item -Path $NewAppDeployToolkit -Destination $ChildItem.FullName -Recurse -Force
+    if (Test-Path ${DeployPfad} -PathType Leaf) {
+      Copy-Item -Path ${NewDeployApplication} -Destination $ChildItem.FullName -Force
+      Copy-Item -Path ${NewAppDeployToolkit} -Destination $ChildItem.FullName -Recurse -Force
     }
   }
 }
