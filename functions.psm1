@@ -138,6 +138,11 @@ function Invoke-Paketieren {
     catch {
       Write-Error "Error while packaging ${appFoldername} $_"
     }
+    finally {
+      if (Test-Path -Path $tempFolderAPP) {
+        Remove-Item -Path $tempFolderAPP -Recurse -Force
+      }
+    }
   }
 }
 
