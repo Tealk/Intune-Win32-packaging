@@ -27,6 +27,9 @@ The 'IntuneWin32App' module is installed automatically if required.
 Use the functions to prepare and upload IntuneWin packages.
 #>
 
+$TenantID = "domain.onmicrosoft.com"
+$ClientID = "00000000-x000-0000-x0x0-00x000000000"
+$ClientSecret = "x0x0x~0xxxxxxxx.0-xxxxZ0xxxxx-0xxxx-xxxx"
 
 function Get-Folder($initialDirectory) {
   [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
@@ -163,7 +166,7 @@ function Invoke-MSIntuneGraph {
       Write-Host "The IntuneWin32App module is not installed. It is being installed now..."
       Install-Module -Name "IntuneWin32App" -AcceptLicense -Force
     }
-        Connect-MSIntuneGraph -TenantID "domain.onmicrosoft.com"
+    Connect-MSIntuneGraph -TenantID "${TenantID}" -ClientID "${ClientID}" -ClientSecret "${ClientSecret}"
     $global:MSIntuneGraphToken = $true
   }
 }
