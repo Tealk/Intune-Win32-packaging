@@ -86,8 +86,15 @@ function Invoke-CompilePackage {
 }
 
 function Invoke-Paketieren {
+  param (
+    [Parameter(Mandatory = $false)]
+    [string]$FolderAPP
+  )
+
   $curDir = Get-Location
-  $FolderAPP = Get-Folder "${curDir}\IN\Standard"
+  if (-not $FolderAPP) {
+    $FolderAPP = Get-Folder "${curDir}\IN\Standard"
+  }
   $File = "Deploy-Application"
   $appFoldername = (Split-Path ${FolderAPP} -Leaf)
   $FilePs1 = "${FolderAPP}\${File}.ps1"
@@ -108,7 +115,7 @@ function Invoke-Paketieren {
       $tempFolderAPP = $(Invoke-CompilePackage -appName "${appFoldername}" -appPath "${FolderAPP}")
     }
     catch {
-      Write-Error "Error while compiling ${appFoldername} $_"
+      Write-Host "Error while compiling ${appFoldername} $_" -ForegroundColor Red
     }
     finally {
       $FilePs1 = "${tempFolderAPP}\${File}.ps1"
@@ -136,7 +143,7 @@ function Invoke-Paketieren {
       }
     }
     catch {
-      Write-Error "Error while packaging ${appFoldername} $_"
+      Write-Host "Error while packaging ${appFoldername} $_" -ForegroundColor Red
     }
     finally {
       if (Test-Path -Path $tempFolderAPP) {
@@ -150,45 +157,10 @@ function Invoke-PaketierenAll {
   $curDir = Get-Location
   $FolderIN = Get-Folder "${curDir}\IN\Standard"
   $FolderAPPs = Get-ChildItem -Path ${FolderIN} -Directory
-  $File = "Deploy-Application"
-  $Version = Get-Date -Format "yy_MM_dd_HH_mm"
 
   foreach (${FolderAPP} in ${FolderAPPs}) {
-    $FilePs1 = "${FolderAPP}\${File}.ps1"
-    $FileExe = "${FolderAPP}\${File}.exe"
-    $FolderOUT = ${FolderAPP} -creplace 'IN', 'OUT'
-    $FileOUT = "${FolderOUT}\${File}.intunewin"
-    Import-Module ${FilePs1} 2>&1
     if (${FolderAPP} -notmatch 'template') {
-      Write-Host "${appName}"
-      Write-Host "=========="
-      if (Test-Path -Path ${FileOUT} -ErrorAction Ignore) {
-        Rename-Item -Path "${FileOUT}" -NewName "${Version}.intunewin"
-      }
-      try {
-        if ((Test-Path -Path "${FilePs1}" -PathType Leaf) -and (Test-Path -Path "${FileExe}" -PathType Leaf)) {
-          if ( -not [string]::IsNullOrEmpty(${uuid})) {
-            Write-Host "Packaging is being started..."
-            $null = (Microsoft-Win32-Content-Prep-Tool\IntuneWinAppUtil.exe -c "${FolderAPP}" -s "${FileExe}" -o "${FolderOUT}" -q)
-            if (Test-Path -Path ${FileOUT} -ErrorAction Ignore) {
-              Write-Host "and was executed successfully." -ForegroundColor Green
-              Invoke-Upload
-            }
-            else {
-              throw "The packaging was not executed successfully."
-            }
-          }
-          else {
-            throw "${appName} has no UUID."
-          }
-        }
-        else {
-          throw "The required files do not exist."
-        }
-      }
-      catch {
-        Write-Error "Error while packaging ${appName} $_"
-      }
+      Invoke-Paketieren -FolderAPP ${FolderAPP}
       Write-Host "=========="
     }
   }
@@ -226,7 +198,7 @@ function Invoke-Upload {
       Write-Host "The detection rule still needs to be adjusted!" -ForegroundColor Magenta
     }
     catch {
-      Write-Error "Error uploading ${appFoldername} $_"
+      Write-Host "Error uploading ${appFoldername} $_" -ForegroundColor Red
     }
   }
 }
