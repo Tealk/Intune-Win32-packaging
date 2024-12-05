@@ -107,9 +107,9 @@ Param (
 [String]$appDeployMainScriptFriendlyName = 'App Deploy Toolkit Main'
 
 ## Variables: Script Info
-[Version]$appDeployMainScriptVersion = [Version]'3.10.0'
+[Version]$appDeployMainScriptVersion = [Version]'3.10.2'
 [Version]$appDeployMainScriptMinimumConfigVersion = [Version]'3.10.0'
-[String]$appDeployMainScriptDate = '03/27/2024'
+[String]$appDeployMainScriptDate = '08/13/2024'
 [Hashtable]$appDeployMainScriptParameters = $PSBoundParameters
 
 ## Variables: Datetime and Culture
@@ -366,12 +366,7 @@ Try {
 Catch{}
 [String]$LocalAdministratorsGroup = & $GetAccountNameUsingSid 'BuiltinAdministratorsSid'
 #  Check if script is running in session zero
-If ($IsLocalSystemAccount -or $IsLocalServiceAccount -or $IsNetworkServiceAccount -or $IsServiceAccount) {
-    $SessionZero = $true
-}
-Else {
-    $SessionZero = $false
-}
+[Boolean]$SessionZero = ($IsLocalSystemAccount -or $IsLocalServiceAccount -or $IsNetworkServiceAccount -or $IsServiceAccount)
 
 ## Variables: Script Name and Script Paths
 [String]$scriptPath = $MyInvocation.MyCommand.Definition
@@ -635,7 +630,7 @@ Else {
 [Boolean]$BlockExecution = $false
 [Boolean]$installationStarted = $false
 [Boolean]$runningTaskSequence = $false
-[Boolean]$LogFileInitialized = $false
+[Boolean]$LogFileInitialized = $AsyncToolkitLaunch -and $ReferredLogname
 If (Test-Path -LiteralPath 'variable:welcomeTimer') {
     Remove-Variable -Name 'welcomeTimer' -Scope 'Script'
 }
@@ -707,6 +702,39 @@ If (Test-Path -LiteralPath 'variable:deferDays') {
 }
 ## Variables: Resolve Parameters. For use in a pipeline
 filter Resolve-Parameters {
+    <#
+.SYNOPSIS
+
+Resolve the parameters of a function call to a string.
+
+.DESCRIPTION
+
+Resolve the parameters of a function call to a string.
+
+.PARAMETER Parameter
+
+The name of the function this function is invoked from.
+
+.INPUTS
+
+System.Object
+
+.OUTPUTS
+
+System.Object
+
+.EXAMPLE
+
+Resolve-Parameters -Parameter $PSBoundParameters | Out-String
+
+.NOTES
+
+This is an internal script function and should typically not be called directly.
+
+.LINK
+
+https://psappdeploytoolkit.com
+#>
     Param (
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
         [ValidateNotNullOrEmpty()]$Parameter
@@ -1016,7 +1044,7 @@ The message to write to the log file or output to the console.
 .PARAMETER Severity
 
 Defines message type. When writing to console or CMTrace.exe log format, it allows highlighting of message type.
-Options: 1 = Information (default), 2 = Warning (highlighted in yellow), 3 = Error (highlighted in red)
+Options: 0 = Success (highlighted in green), 1 = Information (default), 2 = Warning (highlighted in yellow), 3 = Error (highlighted in red)
 
 .PARAMETER Source
 
@@ -1174,13 +1202,13 @@ https://psappdeploytoolkit.com
         If (-not (Test-Path -LiteralPath 'variable:DisableLogging')) {
             $DisableLogging = $false
         }
-        If ([System.String]::IsNullOrWhiteSpace($LogFileName)) {
+        If ([System.String]::IsNullOrEmpty($LogFileName) -or $LogFileName.Trim().Length -eq 0) {
             $DisableLogging = $true
         }
         #  Check if the script section is defined
         [Boolean]$ScriptSectionDefined = [Boolean](-not [String]::IsNullOrEmpty($ScriptSection))
         #  Get the file name of the source script
-        $ScriptSource = If (![System.String]::IsNullOrWhiteSpace($script:MyInvocation.ScriptName)) {
+        $ScriptSource = If (![System.String]::IsNullOrEmpty($script:MyInvocation.ScriptName)) {
             Split-Path -Path $script:MyInvocation.ScriptName -Leaf -ErrorAction SilentlyContinue
         }
         Else {
@@ -1296,7 +1324,7 @@ https://psappdeploytoolkit.com
                     }
 
                     # Get all log files (including any .lo_ files that may have been created by previous toolkit versions) sorted by last write time
-                    $LogFiles = @(Get-ChildItem -LiteralPath $LogFileDirectory -Filter ("{0}_*{1}" -f $LogFileNameWithoutExtension, $LogFileExtension)) + @(Get-Item -LiteralPath ([IO.Path]::ChangeExtension($LogFilePath, 'lo_')) -ErrorAction Ignore) | Sort-Object LastWriteTime
+                    $LogFiles = @(Get-ChildItem -LiteralPath $LogFileDirectory -Filter ("{0}_*{1}" -f $LogFileNameWithoutExtension, $LogFileExtension)) + @(Get-Item -LiteralPath ([IO.Path]::ChangeExtension($LogFilePath, 'lo_')) -ErrorAction SilentlyContinue) | Sort-Object LastWriteTime
 
                     # Keep only the max number of log files
                     if ($LogFiles.Count -gt $MaxLogHistory) {
@@ -2337,6 +2365,9 @@ https://psappdeploytoolkit.com
                 Write-Log 'Failed to disable the Close button. Disabling the Control Box instead.' -Severity 2 -Source ${CmdletName}
                 $formInstallationPrompt.ControlBox = $false
             }
+            # Correct the initial state of the form
+            $formInstallationPrompt.WindowState = 'Normal'
+
             # Get the start position of the form so we can return the form to this position if PersistPrompt is enabled
             Set-Variable -Name 'formInstallationPromptStartPosition' -Value $formInstallationPrompt.Location -Scope 'Script'
         }
@@ -2405,7 +2436,7 @@ https://psappdeploytoolkit.com
         ## Button Left
         $buttonLeft.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonLeft.Name = 'buttonLeft'
-        $buttonLeft.Font = $defaultFont
+        $buttonLeft.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonLeft.ClientSize = $buttonSize
         $buttonLeft.MinimumSize = $buttonSize
         $buttonLeft.MaximumSize = $buttonSize
@@ -2421,7 +2452,7 @@ https://psappdeploytoolkit.com
         ## Button Middle
         $buttonMiddle.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonMiddle.Name = 'buttonMiddle'
-        $buttonMiddle.Font = $defaultFont
+        $buttonMiddle.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonMiddle.ClientSize = $buttonSize
         $buttonMiddle.MinimumSize = $buttonSize
         $buttonMiddle.MaximumSize = $buttonSize
@@ -2437,7 +2468,7 @@ https://psappdeploytoolkit.com
         ## Button Right
         $buttonRight.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonRight.Name = 'buttonRight'
-        $buttonRight.Font = $defaultFont
+        $buttonRight.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonRight.ClientSize = $buttonSize
         $buttonRight.MinimumSize = $buttonSize
         $buttonRight.MaximumSize = $buttonSize
@@ -2453,7 +2484,7 @@ https://psappdeploytoolkit.com
         ## Button Abort (Hidden)
         $buttonAbort.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonAbort.Name = 'buttonAbort'
-        $buttonAbort.Font = $defaultFont
+        $buttonAbort.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonAbort.ClientSize = '0,0'
         $buttonAbort.MinimumSize = '0,0'
         $buttonAbort.MaximumSize = '0,0'
@@ -2509,7 +2540,7 @@ https://psappdeploytoolkit.com
         Else {
             $panelButtons.Padding = $paddingNone
         }
-        $panelButtons.Margin = $paddingNone
+        $panelButtons.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 10, 0, 0)
         $panelButtons.MaximumSize = New-Object -TypeName 'System.Drawing.Size' -ArgumentList (450, 39)
         $panelButtons.AutoSize = $true
         If ($buttonLeftText) {
@@ -3111,7 +3142,7 @@ https://psappdeploytoolkit.com
                 ForEach ($UninstallKeyApp in $UninstallKeyApps) {
                     Try {
                         [PSObject]$regKeyApplicationProps = Get-ItemProperty -LiteralPath $UninstallKeyApp.PSPath -ErrorAction 'Stop'
-                        If ($regKeyApplicationProps | Select-Object -ExpandProperty DisplayName -ErrorAction Ignore) {
+                        If ($regKeyApplicationProps | Select-Object -ExpandProperty DisplayName -ErrorAction SilentlyContinue) {
                             $regKeyApplicationProps
                         }
                     }
@@ -3307,6 +3338,12 @@ Hides all parameters passed to the MSI or MSP file from the toolkit Log file.
 .PARAMETER LoggingOptions
 
 Overrides the default logging options specified in the XML configuration file. Default options are: "/L*v".
+
+.PARAMETER private:LogName
+
+Overrides the default log file name. The default log file name is generated from the MSI file name. If LogName does not end in .log, it will be automatically appended.
+
+For uninstallations, by default the product code is resolved to the DisplayName and version of the application.
 
 .PARAMETER LogName
 
@@ -3563,6 +3600,11 @@ https://psappdeploytoolkit.com
             }
         }
 
+        ## Append the username to the log file name if the toolkit is not running as an administrator, since users do not have the rights to modify files in the ProgramData folder that belong to other users.
+        if (-not $IsAdmin) {
+            $msiLogFile = $msiLogFile + '_' + (Remove-InvalidFileNameChars -Name $EnvUserName)
+        }
+
         ## Append ".log" to the MSI logfile path and enclose in quotes
         If ([IO.Path]::GetExtension($msiLogFile) -ne '.log') {
             [String]$msiLogFile = $msiLogFile + '.log'
@@ -3790,6 +3832,11 @@ Include matches against updates and hotfixes in results.
 .PARAMETER LoggingOptions
 
 Overrides the default logging options specified in the XML configuration file. Default options are: "/L*v".
+
+.PARAMETER private:LogName
+
+Overrides the default log file name. The default log file name is generated from the MSI file name. If LogName does not end in .log, it will be automatically appended.
+For uninstallations, by default the product code is resolved to the DisplayName and version of the application.
 
 .PARAMETER LogName
 
@@ -4205,21 +4252,6 @@ Launch InstallShield "setup.exe" from the ".\Files" sub-directory and force log 
 Execute-Process -Path 'setup.exe' -Parameters "/s /v`"ALLUSERS=1 /qn /L* \`"$configToolkitLogDir\$installName.log`"`""
 
 Launch InstallShield "setup.exe" with embedded MSI and force log files to the logging folder.
-
-.EXAMPLE
-
-Use SCCM to create a single Package and Deployment Type that can run "whether or not a user is logged on" and also displays interaction for logged-on users including RDP session users.
-
-If no user is logged on, in Deploy-Application.ps1:
-Execute-Process -Path "Deploy-Application.exe" -Parameters $DeploymentType
-
-If a user is logged on, in Deploy-Application.ps1:
-[String]$PsExecParameters = "-accepteula -s -w `"$dirSupportFiles`" `"$dirSupportFiles\ServiceUI_x64.exe`" -process:explorer.exe ..\Deploy-Application.exe $DeploymentType"
-[PsObject]$ExecuteProcessResult = Execute-Process -Path "$dirSupportFiles\PsExec64.exe" -Parameters $PsExecParameters -PassThru
-
-Launch PsExec with parameters for ServiceUI and Deploy-Application.exe. Will work with spaces in $scriptParentPath.
-
-If ServiceUI is run directly from SCCM's command line, then execution does not work for RDP session users. Using PsExec in this context also ensures greater chance of success for unknown reasons.
 
 .NOTES
 
@@ -4645,7 +4677,7 @@ Function Get-MsiExitCodeMessage {
 
     Get message for MSI error code by reading it from msimsg.dll
 
-.PARAMETER MsiErrorCode
+.PARAMETER MsiExitCode
 
     MSI error code
 
@@ -4722,7 +4754,7 @@ Wait, up to a timeout (default is 1 millisecond), for the mutex to become availa
 
 The name of the system mutex.
 
-.PARAMETER MutexWaitTime
+.PARAMETER MutexWaitTimeInMilliseconds
 
 The number of milliseconds the current thread should wait to acquire an exclusive lock of a named mutex. Default is: 1 millisecond.
 A wait timeof -1 milliseconds means to wait indefinitely. A wait time of zero does not acquire an exclusive lock but instead tests the state of the wait handle and returns immediately.
@@ -5121,9 +5153,13 @@ Continue copying files if an error is encountered. This will continue the deploy
 
 Use Robocopy to copy files rather than native PowerShell method. Robocopy overcomes the 260 character limit. Supports * in file names, but not folders, in source paths. Default is configured in the AppDeployToolkitConfig.xml file: $true
 
+.PARAMETER RobocopyParams
+
+Override the default Robocopy parameters. Default is: /NJH /NJS /NS /NC /NP /NDL /FP /IS /IT /IM /XX /MT:4 /R:1 /W:1
+
 .PARAMETER RobocopyAdditionalParams
 
-Additional parameters to pass to Robocopy. Default is: $null
+Append to the default Robocopy parameters. Default is: /NJH /NJS /NS /NC /NP /NDL /FP /IS /IT /IM /XX /MT:4 /R:1 /W:1
 
 .INPUTS
 
@@ -5176,7 +5212,8 @@ https://psappdeploytoolkit.com
         [Boolean]$UseRobocopy = $configToolkitUseRobocopy,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$RobocopyAdditionalParams = $null
+        [String]$RobocopyParams = '/NJH /NJS /NS /NC /NP /NDL /FP /IS /IT /IM /XX /MT:4 /R:1 /W:1',
+        [String]$RobocopyAdditionalParams
         )
 
     Begin {
@@ -5200,74 +5237,107 @@ https://psappdeploytoolkit.com
     }
     Process {
         Foreach ($srcPath in $Path) {
-            $UseRobocopyThis = $UseRobocopy
-            If ($UseRobocopyThis) {
-                Try {
+            Try {
+                $UseRobocopyThis = $UseRobocopy
+                If ($UseRobocopyThis) {
                     # Disable Robocopy if $Path has a folder containing a * wildcard
                     If ($srcPath -match '\*.*\\') {
                         $UseRobocopyThis = $false
                         Write-Log "Asterisk wildcard specified in folder portion of path variable. Falling back to native PowerShell method." -Source ${CmdletName} -Severity 2
                     }
+                    # Don't just check for an extension here, also check for base name without extension to allow copying to a directory such as .config
                     If ([IO.Path]::HasExtension($Destination) -and [IO.Path]::GetFileNameWithoutExtension($Destination) -and -not (Test-Path -LiteralPath $Destination -PathType Container)) {
                         $UseRobocopyThis = $false
                         Write-Log "Destination path appears to be a file. Falling back to native PowerShell method." -Source ${CmdletName} -Severity 2
-
                     }
                     If ($UseRobocopyThis) {
-                        # Trim ending backslash from paths which can cause problems
-                        $srcPath = $srcPath.TrimEnd('\')
-                        $Destination = $Destination.TrimEnd('\')
-                        # Robocopy arguments: NJH = No Job Header; NJS = No Job Summary; NS = No Size; NC = No Class; NP = No Progress; NDL = No Directory List; FP = Full Path; IS = Include Same; MT = Number of Threads; R = Number of Retries; W = Wait time between retries in sconds
-                        $RobocopyArgsCopy = "/NJH /NJS /NS /NC /NP /NDL /FP /IS /MT:4 /R:1 /W:1"
-                        If (Test-Path -Path $srcPath -PathType Leaf) {
-                            # If source is a file, split args to the format <SourceFolder> <DestinationFolder> <FileName>
-                            $SourceFolderPath = (Split-Path -Path $srcPath -Parent)
-                            $SourceFilePath = (Split-Path -Path $srcPath -Leaf)
-                            $RobocopyArgsPath =  "`"$SourceFolderPath`" `"$Destination`" `"$SourceFilePath`""
+
+                        # Pre-create destination folder if it does not exist; Robocopy will auto-create non-existent destination folders, but pre-creating ensures we can use Resolve-Path
+                        If (-not (Test-Path -LiteralPath $Destination -PathType Container)) {
+                            Write-Log -Message "Destination assumed to be a folder which does not exist, creating destination folder [$Destination]." -Source ${CmdletName}
+                            $null = New-Item -Path $Destination -Type 'Directory' -Force -ErrorAction 'Stop'
+                        }
+                        If (Test-Path -LiteralPath $srcPath -PathType Container) {
+                            # If source exists as a folder, append the last subfolder to the destination, so that Robocopy produces similar results to native Powershell
+                            # Trim ending backslash from paths which can cause problems with Robocopy
+                            # Resolve paths in case relative paths beggining with .\, ..\, or \ are used
+                            # Strip Microsoft.PowerShell.Core\FileSystem:: from the begginning of the resulting string, since Resolve-Path adds this to UNC paths
+                            $RobocopySource = (Resolve-Path -LiteralPath $srcPath.TrimEnd('\')).Path -replace '^Microsoft\.PowerShell\.Core\\FileSystem::'
+                            $RobocopyDestination = Join-Path ((Resolve-Path -LiteralPath $Destination).Path -replace '^Microsoft\.PowerShell\.Core\\FileSystem::') (Split-Path -Path $srcPath -Leaf)
+                            $RobocopyFile = '*'
                         }
                         Else {
-                            # If source is a folder, append the last subfolder to the destination, so that Robocopy produces similar results to native Powershell
-                            $DestinationFolderPath = Join-Path $Destination (Split-Path -Path $srcPath -Leaf)
-                            $RobocopyArgsPath =  "`"$srcPath`" `"$DestinationFolderPath`" *"
+                            # Else assume source is a file and split args to the format <SourceFolder> <DestinationFolder> <FileName>
+                            # Trim ending backslash from paths which can cause problems with Robocopy
+                            # Resolve paths in case relative paths beggining with .\, ..\, or \ are used
+                            # Strip Microsoft.PowerShell.Core\FileSystem:: from the begginning of the resulting string, since Resolve-Path adds this to UNC paths
+                            $ParentPath = Split-Path -Path $srcPath -Parent
+                            if ([string]::IsNullOrEmpty($ParentPath)) {
+                                $RobocopySource = $PWD
+                            }
+                            else {
+                                $RobocopySource = (Resolve-Path -LiteralPath $ParentPath -ErrorAction Stop).Path -replace '^Microsoft\.PowerShell\.Core\\FileSystem::'
+                            }
+                            $RobocopyDestination = (Resolve-Path -LiteralPath $Destination.TrimEnd('\') -ErrorAction Stop).Path -replace '^Microsoft\.PowerShell\.Core\\FileSystem::'
+                            $RobocopyFile = (Split-Path -Path $srcPath -Leaf)
                         }
                         If ($Flatten) {
                             Write-Log -Message "Copying file(s) recursively in path [$srcPath] to destination [$Destination] root folder, flattened." -Source ${CmdletName}
                             [Hashtable]$CopyFileSplat = @{
-                                Path                    = (Join-Path $srcPath '*')
-                                Destination             = $Destination
-                                Recurse                 = $false
-                                Flatten                 = $false
-                                ContinueOnError         = $ContinueOnError
-                                ContinueFileCopyOnError = $ContinueFileCopyOnError
-                                UseRobocopy             = $UseRobocopy
+                                Path                     = (Join-Path $RobocopySource $RobocopyFile) # This will ensure that the source dir will have \* appended if it was a folder (which prevents creation of a folder at the destination), or keeps the original file name if it was a file
+                                Destination              = $Destination # Use the original destination path, not $RobocopyDestination which could have had a subfolder appended to it
+                                Recurse                  = $false # Disable recursion as this will create subfolders in the destination
+                                Flatten                  = $false # Disable flattening to prevent infinite loops
+                                ContinueOnError          = $ContinueOnError
+                                ContinueFileCopyOnError  = $ContinueFileCopyOnError
+                                UseRobocopy              = $UseRobocopy
+                                RobocopyParams           = $RobocopyParams
+                                RobocopyAdditionalParams = $RobocopyAdditionalParams
                             }
-                            if ($RobocopyAdditionalParams) {
-                                $CopyFileSplat.RobocopyAdditionalParams = $RobocopyAdditionalParams
-                            }
+                            # Copy all files from the root source folder
                             Copy-File @CopyFileSplat
-                            Get-ChildItem -Path $srcPath -Directory -Recurse -Force -ErrorAction 'SilentlyContinue' | ForEach-Object {
-                                $CopyFileSplat.Path = Join-Path $_.FullName '*'
+                            # Copy all files from subfolders
+                            Get-ChildItem -Path $RobocopySource -Directory -Recurse -Force -ErrorAction 'SilentlyContinue' | ForEach-Object {
+                                # Append file name to subfolder path and repeat Copy-File
+                                $CopyFileSplat.Path = Join-Path $_.FullName $RobocopyFile
                                 Copy-File @CopyFileSplat
                             }
-                            # Skip to next $SrcPath in $Path since we have handed off all copy tasks to a separate execution of the function
+                            # Skip to next $SrcPath in $Path since we have handed off all copy tasks to separate executions of the function
                             Continue
                         }
-                        ElseIf ($Recurse) {
-                            $RobocopyArgsCopy = $RobocopyArgsCopy + " /E"
+                        If ($Recurse) {
+                            # Add /E to Robocopy parameters if it is not already included
+                            if ($RobocopyParams -notmatch '/E(\s+|$)' -and $RobocopyAdditionalParams -notmatch '/E(\s+|$)') {
+                                $RobocopyParams = $RobocopyParams + " /E"
+                            }
                             Write-Log -Message "Copying file(s) recursively in path [$srcPath] to destination [$Destination]." -Source ${CmdletName}
                         }
                         Else {
+                            # Ensure that /E is not included in the Robocopy parameters as it will copy recursive folders
+                            $RobocopyParams = $RobocopyParams -replace '/E(\s+|$)'
+                            $RobocopyAdditionalParams = $RobocopyAdditionalParams -replace '/E(\s+|$)'
                             Write-Log -Message "Copying file(s) in path [$srcPath] to destination [$Destination]." -Source ${CmdletName}
                         }
-                        If (![string]::IsNullOrEmpty($RobocopyAdditionalParams)) {
-                            $RobocopyArgsCopy = "$RobocopyArgsCopy $RobocopyAdditionalParams"
+
+                        # Older versions of Robocopy do not support /IM, remove if unsupported
+                        if (!((&Robocopy /?) -match '/IM\s')) {
+                            $RobocopyParams = $RobocopyParams -replace '/IM(\s+|$)'
+                            $RobocopyAdditionalParams = $RobocopyAdditionalParams -replace '/IM(\s+|$)'
                         }
-                        $RobocopyCommandArgs = "$RobocopyArgsCopy $RobocopyArgsPath"
-                        Write-Log -Message "Executing Robocopy command: $RobocopyCommand $RobocopyCommandArgs" -Source ${CmdletName}
-                        $RobocopyResult = Execute-Process -Path $RobocopyCommand -Parameters $RobocopyCommandArgs -CreateNoWindow -ContinueOnError $true -ExitOnProcessFailure $false -Passthru -IgnoreExitCodes '0,1,2,3,4,5,6,7,8'
-                        # Trim the leading whitespace from each line of Robocopy output, ignore the last empty line, and join the lines back together
-                        $RobocopyOutput = ($RobocopyResult.StdOut.Split("`n").TrimStart() | Select-Object -SkipLast 1) -join "`n"
+
+                        If (-not (Test-Path -LiteralPath $RobocopyDestination -PathType Container)) {
+                            $null = New-Item -Path $RobocopyDestination -Type 'Directory' -Force -ErrorAction 'Stop'
+                        }
+                        $DestFolderAttributes = (Get-Item -LiteralPath $RobocopyDestination -Force).Attributes
+
+                        $RobocopyArgs = "$RobocopyParams $RobocopyAdditionalParams `"$RobocopySource`" `"$RobocopyDestination`" `"$RobocopyFile`""
+                        Write-Log -Message "Executing Robocopy command: $RobocopyCommand $RobocopyArgs" -Source ${CmdletName}
+                        $RobocopyResult = Execute-Process -Path $RobocopyCommand -Parameters $RobocopyArgs -CreateNoWindow -ContinueOnError $true -ExitOnProcessFailure $false -Passthru -IgnoreExitCodes '0,1,2,3,4,5,6,7,8'
+                        # Trim the last line plus leading whitespace from each line of Robocopy output
+                        $RobocopyOutput = $RobocopyResult.StdOut.Trim() -Replace '\n\s+',"`n"
                         Write-Log -Message "Robocopy output:`n$RobocopyOutput" -Source ${CmdletName}
+
+                        Set-ItemProperty -LiteralPath $RobocopyDestination -Name Attributes -Value ($DestFolderAttributes -band (-bnot [System.IO.FileAttributes]::Directory))
 
                         Switch ($RobocopyResult.ExitCode) {
                             0 { Write-Log -Message "Robocopy completed. No files were copied. No failure was encountered. No files were mismatched. The files already exist in the destination directory; therefore, the copy operation was skipped." -Source ${CmdletName} }
@@ -5281,28 +5351,20 @@ https://psappdeploytoolkit.com
                             8 { Write-Log -Message "Robocopy completed. Several files didn't copy." -Severity 2 -Source ${CmdletName} }
                             16 {
                                 Write-Log -Message "Serious error. Robocopy did not copy any files. Either a usage error or an error due to insufficient access privileges on the source or destination directories.." -Severity 3 -Source ${CmdletName}
-                                If (-not $ContinueOnError) {
+                                If (-not $ContinueFileCopyOnError) {
                                     Throw "Failed to copy file(s) in path [$srcPath] to destination [$Destination]: $($_.Exception.Message)"
                                 }
                             }
                             default {
-                                Write-Log -Message "Failed to copy file(s) in path [$srcPath] to destination [$Destination]. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
-                                If (-not $ContinueOnError) {
+                                Write-Log -Message "Robocopy error $($RobocopyResult.ExitCode)." -Severity 3 -Source ${CmdletName}
+                                If (-not $ContinueFileCopyOnError) {
                                     Throw "Failed to copy file(s) in path [$srcPath] to destination [$Destination]: $($_.Exception.Message)"
                                 }
                             }
                         }
                     }
                 }
-                Catch {
-                    Write-Log -Message "Failed to copy file(s) in path [$srcPath] to destination [$Destination]. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
-                    If (-not $ContinueOnError) {
-                        Throw "Failed to copy file(s) in path [$srcPath] to destination [$Destination]: $($_.Exception.Message)"
-                    }
-                }
-            }
-            If ($UseRobocopyThis -eq $false) {
-                Try {
+                If ($UseRobocopyThis -eq $false) {
                     # If destination has no extension, or if it has an extension only and no name (e.g. a .config folder) and the destination folder does not exist
                     If ((-not ([IO.Path]::HasExtension($Destination))) -or ([IO.Path]::HasExtension($Destination) -and -not [IO.Path]::GetFileNameWithoutExtension($Destination)) -and (-not (Test-Path -LiteralPath $Destination -PathType 'Container'))) {
                         Write-Log -Message "Destination assumed to be a folder which does not exist, creating destination folder [$Destination]." -Source ${CmdletName}
@@ -5353,11 +5415,14 @@ https://psappdeploytoolkit.com
                         Write-Log -Message 'File copy completed successfully.' -Source ${CmdletName}
                     }
                 }
-                Catch {
-                    Write-Log -Message "Failed to copy file(s) in path [$srcPath] to destination [$Destination]. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
-                    If (-not $ContinueOnError) {
-                        Throw "Failed to copy file(s) in path [$srcPath] to destination [$Destination]: $($_.Exception.Message)"
-                    }
+            }
+            Catch {
+                Write-Log -Message "Failed to copy file(s) in path [$srcPath] to destination [$Destination]. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
+                If (-not $ContinueFileCopyOnError) {
+                    return
+                }
+                If (-not $ContinueOnError) {
+                    Throw "Failed to copy file(s) in path [$srcPath] to destination [$Destination]: $($_.Exception.Message)"
                 }
             }
         }
@@ -5561,6 +5626,22 @@ Use Robocopy to copy files rather than native PowerShell method. Robocopy overco
 
 Additional parameters to pass to Robocopy. Default is: $null
 
+.PARAMETER ExcludeNTAccount
+
+Specify NT account names in Domain\Username format to exclude from the list of user profiles.
+
+.PARAMETER ExcludeSystemProfiles
+
+Exclude system profiles: SYSTEM, LOCAL SERVICE, NETWORK SERVICE. Default is: $true.
+
+.PARAMETER ExcludeServiceProfiles
+
+Exclude service profiles where NTAccount begins with NT SERVICE. Default is: $true.
+
+.PARAMETER ExcludeDefaultUser
+
+Exclude the Default User. Default is: $false.
+
 .INPUTS
 
 You can pipe in string values for $Path.
@@ -5613,16 +5694,28 @@ https://psappdeploytoolkit.com
         [Switch]$Flatten,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [Boolean]$ContinueOnError = $true,
-        [Parameter(Mandatory = $false)]
-        [ValidateNotNullOrEmpty()]
-        [Boolean]$ContinueFileCopyOnError = $false,
-        [Parameter(Mandatory = $false)]
-        [ValidateNotNullOrEmpty()]
         [Boolean]$UseRobocopy = $configToolkitUseRobocopy,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$RobocopyAdditionalParams = $null
+        [String]$RobocopyAdditionalParams = $null,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [String[]]$ExcludeNTAccount,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Boolean]$ExcludeSystemProfiles = $true,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Boolean]$ExcludeServiceProfiles = $true,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Switch]$ExcludeDefaultUser = $false,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Boolean]$ContinueOnError = $true,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Boolean]$ContinueFileCopyOnError = $false
     )
 
     Begin {
@@ -5643,7 +5736,16 @@ https://psappdeploytoolkit.com
             $CopyFileSplat.RobocopyAdditionalParams = $RobocopyAdditionalParams
         }
 
-        foreach ($UserProfilePath in (Get-UserProfiles).ProfilePath) {
+        [Hashtable]$GetUserProfileSplat = @{
+            ExcludeSystemProfiles = $ExcludeSystemProfiles
+            ExcludeServiceProfiles = $ExcludeServiceProfiles
+            ExcludeDefaultUser = $ExcludeDefaultUser
+        }
+        if ($ExcludeNTAccount) {
+            $GetUserProfileSplat.ExcludeNTAccount = $ExcludeNTAccount
+        }
+
+        foreach ($UserProfilePath in (Get-UserProfiles @GetUserProfileSplat).ProfilePath) {
             $CopyFileSplat.Destination = Join-Path $UserProfilePath $Destination
             Write-Log -Message "Copying path [$Path] to $($CopyFileSplat.Destination):" -Source ${CmdletName}
             Copy-File @CopyFileSplat
@@ -5678,6 +5780,22 @@ Specifies the path to append to the root of the user profile to be resolved. The
 .PARAMETER Recurse
 
 Deletes the files in the specified location(s) and in all child items of the location(s).
+
+.PARAMETER ExcludeNTAccount
+
+Specify NT account names in Domain\Username format to exclude from the list of user profiles.
+
+.PARAMETER ExcludeSystemProfiles
+
+Exclude system profiles: SYSTEM, LOCAL SERVICE, NETWORK SERVICE. Default is: $true.
+
+.PARAMETER ExcludeServiceProfiles
+
+Exclude service profiles where NTAccount begins with NT SERVICE. Default is: $true.
+
+.PARAMETER ExcludeDefaultUser
+
+Exclude the Default User. Default is: $false.
 
 .PARAMETER ContinueOnError
 
@@ -5721,6 +5839,18 @@ https://psappdeploytoolkit.com
         [Switch]$Recurse = $false,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
+        [String[]]$ExcludeNTAccount,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Boolean]$ExcludeSystemProfiles = $true,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Boolean]$ExcludeServiceProfiles = $true,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
+        [Switch]$ExcludeDefaultUser = $false,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
         [Boolean]$ContinueOnError = $true
     )
 
@@ -5735,7 +5865,16 @@ https://psappdeploytoolkit.com
             ContinueOnError = $ContinueOnError
         }
 
-        ForEach ($UserProfilePath in (Get-UserProfiles).ProfilePath) {
+        [Hashtable]$GetUserProfileSplat = @{
+            ExcludeSystemProfiles = $ExcludeSystemProfiles
+            ExcludeServiceProfiles = $ExcludeServiceProfiles
+            ExcludeDefaultUser = $ExcludeDefaultUser
+        }
+        if ($ExcludeNTAccount) {
+            $GetUserProfileSplat.ExcludeNTAccount = $ExcludeNTAccount
+        }
+
+        ForEach ($UserProfilePath in (Get-UserProfiles @GetUserProfileSplat).ProfilePath) {
             If ($PSCmdlet.ParameterSetName -eq 'Path') {
                 $RemoveFileSplat.Path = $Path | ForEach-Object { Join-Path $UserProfilePath $_ }
                 Write-Log -Message "Removing path [$Path] from $UserProfilePath`:" -Source ${CmdletName}
@@ -6914,6 +7053,10 @@ Specify NT account names in Domain\Username format to exclude from the list of u
 
 Exclude system profiles: SYSTEM, LOCAL SERVICE, NETWORK SERVICE. Default is: $true.
 
+.PARAMETER ExcludeServiceProfiles
+
+Exclude service profiles where NTAccount begins with NT SERVICE. Default is: $true.
+
 .PARAMETER ExcludeDefaultUser
 
 Exclude the Default User. Default is: $false.
@@ -6960,6 +7103,9 @@ https://psappdeploytoolkit.com
         [Boolean]$ExcludeSystemProfiles = $true,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
+        [Boolean]$ExcludeServiceProfiles = $true,
+        [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
         [Switch]$ExcludeDefaultUser = $false
     )
 
@@ -6983,6 +7129,9 @@ https://psappdeploytoolkit.com
             If ($ExcludeSystemProfiles) {
                 [String[]]$SystemProfiles = 'S-1-5-18', 'S-1-5-19', 'S-1-5-20'
                 [PSObject[]]$UserProfiles = $UserProfiles | Where-Object { $SystemProfiles -notcontains $_.SID }
+            }
+            If ($ExcludeServiceProfiles) {
+                [PSObject[]]$UserProfiles = $UserProfiles | Where-Object { $_.NTAccount -notlike 'NT SERVICE\*' }
             }
             If ($ExcludeNTAccount) {
                 [PSObject[]]$UserProfiles = $UserProfiles | Where-Object { $ExcludeNTAccount -notcontains $_.NTAccount }
@@ -7108,6 +7257,7 @@ https://psappdeploytoolkit.com
                 }
 
                 If ($fileVersion) {
+                    $fileVersion = $fileVersion.Trim()
                     If ($ProductVersion) {
                         Write-Log -Message "Product version is [$fileVersion]." -Source ${CmdletName}
                     }
@@ -7409,6 +7559,10 @@ Only specify the parameters that you want to change.
 .PARAMETER Path
 
 Path to the shortcut to be changed
+
+.PARAMETER PathHash
+
+Hashtable of parameters to be changed
 
 .PARAMETER TargetPath
 
@@ -7806,12 +7960,7 @@ https://psappdeploytoolkit.com
                 $shortcut = $null
                 ## Run as admin
                 [Byte[]]$filebytes = [IO.FIle]::ReadAllBytes($FullPath)
-                If ($filebytes[21] -band 32) {
-                    $Output.RunAsAdmin = $true
-                }
-                Else {
-                    $Output.RunAsAdmin = $false
-                }
+                $Output.RunAsAdmin = [Boolean]($filebytes[21] -band 32)
             }
             Write-Output -InputObject ($Output)
         }
@@ -7897,15 +8046,20 @@ Returns the exit code from this function or the process launched by the schedule
 
 .EXAMPLE
 
-Execute-ProcessAsUser -UserName 'CONTOSO\User' -Path "$PSHOME\powershell.exe" -Parameters "-Command & { & `"C:\Test\Script.ps1`"; Exit `$LastExitCode }" -Wait
+Execute-ProcessAsUser -UserName 'CONTOSO\User' -Path "$PSHOME\powershell.exe" -Parameters "-Command `"& { & 'C:\Test\Script.ps1'; Exit `$LastExitCode }`"" -Wait
 
 Execute process under a user account by specifying a username under which to execute it.
 
 .EXAMPLE
 
-Execute-ProcessAsUser -Path "$PSHOME\powershell.exe" -Parameters "-Command & { & `"C:\Test\Script.ps1`"; Exit `$LastExitCode }" -Wait
+Execute-ProcessAsUser -Path "$PSHOME\powershell.exe" -Parameters "-Command `"& { & 'C:\Test\Script.ps1'; Exit `$LastExitCode }`"" -Wait
 
 Execute process under a user account by using the default active logged in user that was detected when the toolkit was launched.
+
+.EXAMPLE
+Execute-ProcessAsUser -Path "$PSHOME\powershell.exe" -Parameters "-Command `"& { & 'C:\Test\Script.ps1'; Exit `$LastExitCode }`"" -RunLevel 'LeastPrivilege'
+
+Execute process using 'LeastPrivilege' under a user account by using the default active logged in user that was detected when the toolkit was launched.
 
 .NOTES
 
@@ -7950,7 +8104,7 @@ https://psappdeploytoolkit.com
         [String]${CmdletName} = $PSCmdlet.MyInvocation.MyCommand.Name
         Write-FunctionHeaderOrFooter -CmdletName ${CmdletName} -CmdletBoundParameters $PSBoundParameters -Header
 
-        If ((-not [String]::IsNullOrEmpty($TempPath))) {
+        If (-not [String]::IsNullOrEmpty($TempPath)) {
             $executeAsUserTempPath = $TempPath
             If (($TempPath -eq $loggedOnUserTempPath) -and ($RunLevel -eq 'HighestPrivilege')) {
                 Write-Log -Message "WARNING: Using [${CmdletName}] with a user writable directory using the 'HighestPrivilege' creates a security vulnerability. Please use -RunLevel 'LeastPrivilege' when using a user writable directoy." -Severity 'Warning'
@@ -7961,103 +8115,106 @@ https://psappdeploytoolkit.com
         }
     }
     Process {
+
+        ## Initialize exit code variable
+        [Int32]$executeProcessAsUserExitCode = 0
+
+        ## Confirm that the username field is not empty
+        If (-not $UserName) {
+            [Int32]$executeProcessAsUserExitCode = 60009
+            Write-Log -Message "The function [${CmdletName}] has a -UserName parameter that has an empty default value because no logged in users were detected when the toolkit was launched." -Severity 3 -Source ${CmdletName}
+            If (-not $ContinueOnError) {
+                Throw "The function [${CmdletName}] has a -UserName parameter that has an empty default value because no logged in users were detected when the toolkit was launched."
+            }
+            Return
+        }
+
+        ## Confirm if the toolkit is running with administrator privileges
+        If (($RunLevel -eq 'HighestAvailable') -and (-not $IsAdmin)) {
+            [Int32]$executeProcessAsUserExitCode = 60003
+            Write-Log -Message "The function [${CmdletName}] requires the toolkit to be running with Administrator privileges if the [-RunLevel] parameter is set to 'HighestAvailable'." -Severity 3 -Source ${CmdletName}
+            If (-not $ContinueOnError) {
+                Throw "The function [${CmdletName}] requires the toolkit to be running with Administrator privileges if the [-RunLevel] parameter is set to 'HighestAvailable'."
+            }
+            Return
+        }
+
+        ## Check whether the specified Working Directory exists
+        If ($WorkingDirectory -and (-not (Test-Path -LiteralPath $WorkingDirectory -PathType 'Container'))) {
+            Write-Log -Message 'The specified working directory does not exist or is not a directory. The scheduled task might not work as expected.' -Severity 2 -Source ${CmdletName}
+        }
+
+        ##  Remove the temporary folder
+        If (Test-Path -LiteralPath $executeAsUserTempPath -PathType 'Container') {
+            Write-Log -Message "Previous [$executeAsUserTempPath] found. Attempting removal." -Source ${CmdletName}
+            Remove-Folder -Path $executeAsUserTempPath
+        }
+        #  Recreate the temporary folder
         Try {
-            ## Initialize exit code variable
-            [Int32]$executeProcessAsUserExitCode = 0
+            Write-Log -Message "Creating [$executeAsUserTempPath]." -Source ${CmdletName}
+            $null = New-Item -Path $executeAsUserTempPath -ItemType 'Directory' -ErrorAction 'Stop'
+        }
+        Catch {
+            Write-Log -Message "Unable to create [$executeAsUserTempPath]. Possible attempt to gain elevated rights." -Source ${CmdletName} -Severity 2
+        }
+        #  Copy RunHidden.vbs to temp path
+        Try {
+            Write-Log -Message "Copying [$appDeployRunHiddenVbsFile] to destination [$executeAsUserTempPath]." -Source ${CmdletName}
+            Copy-Item -LiteralPath $appDeployRunHiddenVbsFile -Destination $executeAsUserTempPath -Force -ErrorAction 'Stop'
+        }
+        Catch {
+            Write-Log -Message "Unable to copy [$appDeployRunHiddenVbsFile] to destination [$executeAsUserTempPath]." -Source ${CmdletName} -Severity 2
+        }
+        #  Set user permissions on RunHidden.vbs
+        Try {
+            Set-ItemPermission -Path "$($executeAsUserTempPath)\RunHidden.vbs" -User $UserName -Permission 'Read' -ErrorAction 'Stop'
+        }
+        Catch {
+            Write-Log -Message "Failed to set read permissions on path [$($executeAsUserTempPath)\RunHidden.vbs]. The function might not be able to work correctly." -Source ${CmdletName} -Severity 2
+        }
 
-            ## Confirm that the username field is not empty
-            If (-not $UserName) {
-                [Int32]$executeProcessAsUserExitCode = 60009
-                Write-Log -Message "The function [${CmdletName}] has a -UserName parameter that has an empty default value because no logged in users were detected when the toolkit was launched." -Severity 3 -Source ${CmdletName}
-                If (-not $ContinueOnError) {
-                    Throw "The function [${CmdletName}] has a -UserName parameter that has an empty default value because no logged in users were detected when the toolkit was launched."
-                }
-                Return
+        ## If powershell.exe or cmd.exe is being launched, then create a VBScript to launch the shell so that we can suppress the console window that flashes otherwise
+        If (((Split-Path -Path $Path -Leaf) -ilike 'powershell*') -or ((Split-Path -Path $Path -Leaf) -ilike 'cmd*')) {
+            If ($SecureParameters) {
+                Write-Log -Message "Preparing parameters for VBScript that will start [$Path (Parameters Hidden)] as the logged-on user [$userName] and suppress the console window..." -Source ${CmdletName}
             }
-
-            ## Confirm if the toolkit is running with administrator privileges
-            If (($RunLevel -eq 'HighestAvailable') -and (-not $IsAdmin)) {
-                [Int32]$executeProcessAsUserExitCode = 60003
-                Write-Log -Message "The function [${CmdletName}] requires the toolkit to be running with Administrator privileges if the [-RunLevel] parameter is set to 'HighestAvailable'." -Severity 3 -Source ${CmdletName}
-                If (-not $ContinueOnError) {
-                    Throw "The function [${CmdletName}] requires the toolkit to be running with Administrator privileges if the [-RunLevel] parameter is set to 'HighestAvailable'."
-                }
-                Return
-            }
-
-            ## Check whether the specified Working Directory exists
-            If ($WorkingDirectory -and (-not (Test-Path -LiteralPath $WorkingDirectory -PathType 'Container'))) {
-                Write-Log -Message 'The specified working directory does not exist or is not a directory. The scheduled task might not work as expected.' -Severity 2 -Source ${CmdletName}
-            }
-
-            ##  Remove the temporary folder
-            If (Test-Path -LiteralPath $executeAsUserTempPath -PathType 'Container') {
-                Write-Log -Message "Previous [$executeAsUserTempPath] found. Attempting removal." -Source ${CmdletName}
-                Remove-Folder -Path $executeAsUserTempPath
-            }
-            #  Recreate the temporary folder
-            Try {
-                Write-Log -Message "Creating [$executeAsUserTempPath]." -Source ${CmdletName}
-                $null = New-Item -Path $executeAsUserTempPath -ItemType 'Directory' -ErrorAction 'Stop'
-            }
-            Catch {
-                Write-Log -Message "Unable to create [$executeAsUserTempPath]. Possible attempt to gain elevated rights." -Source ${CmdletName} -Severity 2
-            }
-            #  Copy RunHidden.vbs to temp path
-            Try {
-                Write-Log -Message "Copying [$appDeployRunHiddenVbsFile] to destination [$executeAsUserTempPath]." -Source ${CmdletName}
-                Copy-Item -LiteralPath $appDeployRunHiddenVbsFile -Destination $executeAsUserTempPath -Force -ErrorAction 'Stop'
-            }
-            Catch {
-                Write-Log -Message "Unable to copy [$appDeployRunHiddenVbsFile] to destination [$executeAsUserTempPath]." -Source ${CmdletName} -Severity 2
-            }
-            #  Set user permissions on RunHidden.vbs
-            Try {
-                Set-ItemPermission -Path "$($executeAsUserTempPath)\RunHidden.vbs" -User $UserName -Permission 'Read' -ErrorAction 'Stop'
-            }
-            Catch {
-                Write-Log -Message "Failed to set read permissions on path [$($executeAsUserTempPath)\RunHidden.vbs]. The function might not be able to work correctly." -Source ${CmdletName} -Severity 2
+            Else {
+                Write-Log -Message "Preparing parameters for VBScript that will start [$Path $Parameters] as the logged-on user [$userName] and suppress the console window..." -Source ${CmdletName}
             }
 
-            ## If powershell.exe or cmd.exe is being launched, then create a VBScript to launch the shell so that we can suppress the console window that flashes otherwise
-            If (((Split-Path -Path $Path -Leaf) -ilike 'powershell*') -or ((Split-Path -Path $Path -Leaf) -ilike 'cmd*')) {
-                If ($SecureParameters) {
-                    Write-Log -Message "Preparing parameters for VBScript that will start [$Path (Parameters Hidden)] as the logged-on user [$userName] and suppress the console window..." -Source ${CmdletName}
-                }
-                Else {
-                    Write-Log -Message "Preparing parameters for VBScript that will start [$Path $Parameters] as the logged-on user [$userName] and suppress the console window..." -Source ${CmdletName}
-                }
-
-                [String]$NewParameters = "/e:vbscript"
-                If ($executeAsUserTempPath -match ' ') {
-                    $NewParameters = "$($NewParameters) `"$($executeAsUserTempPath)\RunHidden.vbs`""
-                }
-                Else {
-                    $NewParameters = "$($NewParameters) $($executeAsUserTempPath)\RunHidden.vbs"
-                }
-                If (($Path -notmatch "^[`'].*[`']$") -and ($Path -notmatch "^[`"].*[`"]$") -and $Path -match ' ') {
-                    $NewParameters = "$($NewParameters) `"$($Path)`""
-                }
-                Else {
-                    $NewParameters = "$NewParameters $Path"
-                }
-
-                $Parameters = "$NewParameters $Parameters"
-                $Path = "$envWinDir\System32\wscript.exe"
+            [String]$NewParameters = "/e:vbscript"
+            If ($executeAsUserTempPath -match ' ') {
+                $NewParameters = "$($NewParameters) `"$($executeAsUserTempPath)\RunHidden.vbs`""
             }
-            #  Replace invalid XML characters in parameters with their valid XML equivalent
-            [String]$XmlEscapedPath = [System.Security.SecurityElement]::Escape($Path)
-            [String]$XmlEscapedParameters = [System.Security.SecurityElement]::Escape($Parameters)
-            #  Prepare working directory XML element
-            [String]$WorkingDirectoryInsert = ''
-            If ($WorkingDirectory) {
-                [String]$XmlEscapedWorkingDirectory = [System.Security.SecurityElement]::Escape($WorkingDirectory)
-                $WorkingDirectoryInsert = "`r`n   <WorkingDirectory>$XmlEscapedWorkingDirectory</WorkingDirectory>"
+            Else {
+                $NewParameters = "$($NewParameters) $($executeAsUserTempPath)\RunHidden.vbs"
             }
-            [String]$XmlEscapedUserName = [System.Security.SecurityElement]::Escape($UserName)
+            If (($Path -notmatch "^[`'].*[`']$") -and ($Path -notmatch "^[`"].*[`"]$") -and $Path -match ' ') {
+                $NewParameters = "$($NewParameters) `"$($Path)`""
+            }
+            Else {
+                $NewParameters = "$NewParameters $Path"
+            }
 
-            ## Specify the scheduled task configuration in XML format
-            [String]$xmlSchTask = @"
+            # VBScript args do not handle quotes well, so replace all double quotes with placeholder [{quote}] before sending to the script
+            $Parameters = $Parameters.Replace('"','[{quote}]')
+
+            $Parameters = "$NewParameters $Parameters"
+            $Path = "$envWinDir\System32\wscript.exe"
+        }
+        #  Replace invalid XML characters in parameters with their valid XML equivalent
+        [String]$XmlEscapedPath = [System.Security.SecurityElement]::Escape($Path)
+        [String]$XmlEscapedParameters = [System.Security.SecurityElement]::Escape($Parameters)
+        #  Prepare working directory XML element
+        [String]$WorkingDirectoryInsert = ''
+        If ($WorkingDirectory) {
+            [String]$XmlEscapedWorkingDirectory = [System.Security.SecurityElement]::Escape($WorkingDirectory)
+            $WorkingDirectoryInsert = "`r`n   <WorkingDirectory>$XmlEscapedWorkingDirectory</WorkingDirectory>"
+        }
+        [String]$XmlEscapedUserName = [System.Security.SecurityElement]::Escape($UserName)
+
+        ## Specify the scheduled task configuration in XML format
+        [String]$xmlSchTask = @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo />
@@ -8096,45 +8253,52 @@ https://psappdeploytoolkit.com
   </Principals>
 </Task>
 "@
-            ## Export the XML to file
-            Try {
-                ## Build the scheduled task XML name
-                [String]$schTaskNameCount = '001'
-                [String]$schTaskName = "$($("$($appDeployToolkitName)-ExecuteAsUser" -replace ' ', '').Trim('_') -replace '[_]+', '_')"
-                #  Specify the filename to export the XML to
-                [String]$previousXmlFileName = Get-ChildItem -Path "$($dirAppDeployTemp)\*" -Attributes '!Directory' -Include '*.xml' | Where-Object { $_.Name -match "^$($schTaskName)-\d{3}\.xml$" } | Sort-Object -Descending -Property 'LastWriteTime' | Select-Object -ExpandProperty 'Name' -First 1
-                If (-not [String]::IsNullOrEmpty($previousXmlFileName)) {
-                    [Int32]$xmlFileCount = [IO.Path]::GetFileNameWithoutExtension($previousXmlFileName) | ForEach-Object { $_.Substring($_.length - 3, 3) }
-                    [String]$schTaskNameCount = '{0:d3}' -f $xmlFileCount++
-                }
-                $schTaskName = "$($schTaskName)-$($schTaskNameCount)"
-                [String]$xmlSchTaskFilePath = "$($dirAppDeployTemp)\$($schTaskName).xml"
+        ## Export the XML to file
+        Try {
+            ## Build the scheduled task XML name
+            [String]$schTaskNameCount = '001'
+            [String]$schTaskName = "$($("$($appDeployToolkitName)-ExecuteAsUser" -replace ' ', '').Trim('_') -replace '[_]+', '_')"
+            #  Specify the filename to export the XML to
+            [String]$previousXmlFileName = Get-ChildItem -Path "$($dirAppDeployTemp)\*" -Attributes '!Directory' -Include '*.xml' | Where-Object { $_.Name -match "^$($schTaskName)-\d{3}\.xml$" } | Sort-Object -Descending -Property 'LastWriteTime' | Select-Object -ExpandProperty 'Name' -First 1
+            If (-not [String]::IsNullOrEmpty($previousXmlFileName)) {
+                [Int32]$xmlFileCount = [IO.Path]::GetFileNameWithoutExtension($previousXmlFileName) | ForEach-Object { $_.Substring($_.length - 3, 3) }
+                [String]$schTaskNameCount = '{0:d3}' -f $xmlFileCount++
+            }
+            $schTaskName = "$($schTaskName)-$($schTaskNameCount)"
+            [String]$xmlSchTaskFilePath = "$($dirAppDeployTemp)\$($schTaskName).xml"
 
-                #  Export the XML file
-                [String]$xmlSchTask | Out-File -FilePath $xmlSchTaskFilePath -Force -ErrorAction 'Stop'
+            #  Export the XML file
+            [String]$xmlSchTask | Out-File -FilePath $xmlSchTaskFilePath -Force -ErrorAction 'Stop'
+            Try {
                 Set-ItemPermission -Path $xmlSchTaskFilePath -User $UserName -Permission 'Read'
             }
             Catch {
-                [Int32]$executeProcessAsUserExitCode = 60007
-                Write-Log -Message "Failed to export the scheduled task XML file [$xmlSchTaskFilePath]. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
-                If (-not $ContinueOnError) {
-                    Throw "Failed to export the scheduled task XML file [$xmlSchTaskFilePath]: $($_.Exception.Message)"
-                }
-                Return
+                Write-Log -Message "Failed to set read permissions on path [$xmlSchTaskFilePath]. The function might not be able to work correctly." -Source ${CmdletName} -Severity 2
             }
+        }
+        Catch {
+            [Int32]$executeProcessAsUserExitCode = 60007
+            Write-Log -Message "Failed to export the scheduled task XML file [$xmlSchTaskFilePath]. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
+            If (-not $ContinueOnError) {
+                Throw "Failed to export the scheduled task XML file [$xmlSchTaskFilePath]: $($_.Exception.Message)"
+            }
+            Return
+        }
 
-            ## Create Scheduled Task to run the process with a logged-on user account
-            If ($Parameters) {
-                If ($SecureParameters) {
-                    Write-Log -Message "Creating scheduled task to execute [$Path (Parameters Hidden)] as the logged-on user [$userName]..." -Source ${CmdletName}
-                }
-                Else {
-                    Write-Log -Message "Creating scheduled task to execute [$Path $Parameters] as the logged-on user [$userName]..." -Source ${CmdletName}
-                }
+        ## Create Scheduled Task to run the process with a logged-on user account
+        If ($Parameters) {
+            If ($SecureParameters) {
+                Write-Log -Message "Creating scheduled task to execute [$Path (Parameters Hidden)] as the logged-on user [$userName]..." -Source ${CmdletName}
             }
             Else {
-                Write-Log -Message "Creating scheduled task to execute [$Path] as the logged-on user [$userName]..." -Source ${CmdletName}
+                Write-Log -Message "Creating scheduled task to execute [$Path $Parameters] as the logged-on user [$userName]..." -Source ${CmdletName}
             }
+        }
+        Else {
+            Write-Log -Message "Creating scheduled task to execute [$Path] as the logged-on user [$userName]..." -Source ${CmdletName}
+        }
+
+        Try {
             [PSObject]$schTaskResult = Execute-Process -Path $exeSchTasks -Parameters "/create /f /tn $schTaskName /xml `"$xmlSchTaskFilePath`"" -WindowStyle 'Hidden' -CreateNoWindow -PassThru -ExitOnProcessFailure $false
             If ($schTaskResult.ExitCode -ne 0) {
                 [Int32]$executeProcessAsUserExitCode = $schTaskResult.ExitCode
@@ -8212,6 +8376,9 @@ https://psappdeploytoolkit.com
             Else {
                 Start-Sleep -Seconds 1
             }
+        }
+        Catch {
+            Throw $_
         }
         Finally {
             ## Delete scheduled task
@@ -8598,14 +8765,12 @@ https://psappdeploytoolkit.com
         [String]${CmdletName} = $PSCmdlet.MyInvocation.MyCommand.Name
         Write-FunctionHeaderOrFooter -CmdletName ${CmdletName} -CmdletBoundParameters $PSBoundParameters -Header
 
-        ## Remove illegal characters from the scheduled task arguments string
-        [char[]]$invalidScheduledTaskChars = '$', '!', '''', '"', '(', ')', ';', '\', '`', '*', '?', '{', '}', '[', ']', '<', '>', '|', '&', '%', '#', '~', '@', ' '
-        [string]$SchInstallName = $installName
-        ForEach ($invalidChar in $invalidScheduledTaskChars) {
-            [string]$SchInstallName = $SchInstallName -replace [regex]::Escape($invalidChar),''
-        }
+        ## Replace any double quotes with two single quotes to avoid issues calling VBScript
+        $SchInstallName = $installName.Replace('"', "''")
+        $SchInstallTitle = $installTitle.Replace('"', "''")
         [string]$blockExecutionTempPath = Join-Path -Path $dirAppDeployTemp -ChildPath 'BlockExecution'
-        [string]$schTaskUnblockAppsCommand += "-ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -File `"$blockExecutionTempPath\$scriptFileName`" -CleanupBlockedApps -ReferredInstallName `"$SchInstallName`" -ReferredInstallTitle `"$installTitle`" -ReferredLogName `"$logName`" -AsyncToolkitLaunch"
+        ## Escape characters ready for insertion in XML, e.g.  & = &amp;   " = &quot;
+        [string]$schTaskUnblockAppsCommand = [System.Security.SecurityElement]::Escape("-ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -File `"$blockExecutionTempPath\$scriptFileName`" -CleanupBlockedApps -ReferredInstallName `"$SchInstallName`" -ReferredInstallTitle `"$SchInstallTitle`" -ReferredLogName `"$logName`" -AsyncToolkitLaunch")
         ## Specify the scheduled task configuration in XML format
         [string]$xmlUnblockAppsSchTask = @"
 <?xml version="1.0" encoding="UTF-16"?>
@@ -8677,7 +8842,7 @@ https://psappdeploytoolkit.com
         Copy-Item -Path "$scriptRoot\*.*" -Destination $blockExecutionTempPath -Exclude 'thumbs.db' -Force -Recurse -ErrorAction 'SilentlyContinue'
 
         ## Build the debugger block value script
-        [String[]]$debuggerBlockScript = "strCommand = `"$PSHome\powershell.exe -ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -File `" & chr(34) & `"$blockExecutionTempPath\$scriptFileName`" & chr(34) & `" -ShowBlockedAppDialog -AsyncToolkitLaunch -ReferredInstallTitle `" & chr(34) & `"$installTitle`" & chr(34)"
+        [String[]]$debuggerBlockScript = "strCommand = `"$PSHome\powershell.exe -ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -File `" & chr(34) & `"$blockExecutionTempPath\$scriptFileName`" & chr(34) & `" -ShowBlockedAppDialog -AsyncToolkitLaunch -ReferredInstallTitle `" & chr(34) & `"$SchInstallTitle`" & chr(34)"
         $debuggerBlockScript += 'set oWShell = CreateObject("WScript.Shell")'
         $debuggerBlockScript += 'oWShell.Run strCommand, 0, false'
         $debuggerBlockScript | Out-File -FilePath "$blockExecutionTempPath\AppDeployToolkit_BlockAppExecutionMessage.vbs" -Force -Encoding 'Default' -ErrorAction 'SilentlyContinue'
@@ -8844,6 +9009,14 @@ Get the history of deferrals from the registry for the current application, if i
 
 Get the history of deferrals from the registry for the current application, if it exists.
 
+.PARAMETER DeferTimesRemaining
+
+Specify the number of deferrals remaining.
+
+.PARAMETER DeferDeadline
+
+Specify the deadline for the deferral.
+
 .INPUTS
 
 None
@@ -8898,6 +9071,14 @@ Set the history of deferrals in the registry for the current application.
 .DESCRIPTION
 
 Set the history of deferrals in the registry for the current application.
+
+.PARAMETER DeferTimesRemaining
+
+Specify the number of deferrals remaining.
+
+.PARAMETER DeferDeadline
+
+Specify the deadline for the deferral.
 
 .INPUTS
 
@@ -9115,7 +9296,7 @@ https://psappdeploytoolkit.com
         [Diagnostics.Process[]]$runningProcesses = foreach ($process in (Get-Process -Name $processObjects.ProcessName -ErrorAction SilentlyContinue))
         {
             Add-Member -InputObject $process -MemberType NoteProperty -Name ProcessDescription -Force -PassThru -Value $(
-                if (![System.String]::IsNullOrWhiteSpace(($objDescription = ($processObjects | Where-Object {$_.ProcessName -eq $process.ProcessName}).ProcessDescription)))
+                if (![System.String]::IsNullOrEmpty(($objDescription = ($processObjects | Where-Object {$_.ProcessName -eq $process.ProcessName}).ProcessDescription)))
                 {
                     # The description of the process provided as a Parameter to the function, e.g. -ProcessName "winword=Microsoft Office Word".
                     $objDescription
@@ -9944,7 +10125,9 @@ https://psappdeploytoolkit.com
         $labelCloseAppsMessage = New-Object -TypeName 'System.Windows.Forms.Label'
         $labelCountdownMessage = New-Object -TypeName 'System.Windows.Forms.Label'
         $labelCountdown = New-Object -TypeName 'System.Windows.Forms.Label'
-        $labelDefer = New-Object -TypeName 'System.Windows.Forms.Label'
+        $labelDeferExpiryMessage = New-Object -TypeName 'System.Windows.Forms.Label'
+        $labelDeferDeadline = New-Object -TypeName 'System.Windows.Forms.Label'
+        $labelDeferWarningMessage = New-Object -TypeName 'System.Windows.Forms.Label'
         $listBoxCloseApps = New-Object -TypeName 'System.Windows.Forms.ListBox'
         $buttonContinue = New-Object -TypeName 'System.Windows.Forms.Button'
         $buttonDefer = New-Object -TypeName 'System.Windows.Forms.Button'
@@ -9984,7 +10167,10 @@ https://psappdeploytoolkit.com
                 Write-Log 'Failed to disable the Close button. Disabling the Control Box instead.' -Severity 2 -Source ${CmdletName}
                 $formWelcome.ControlBox = $false
             }
-            #  Get the start position of the form so we can return the form to this position if PersistPrompt is enabled
+            # Correct the initial state of the form
+            $formWelcome.WindowState = 'Normal'
+
+            # Get the start position of the form so we can return the form to this position if PersistPrompt is enabled
             Set-Variable -Name 'formWelcomeStartPosition' -Value $formWelcome.Location -Scope 'Script'
 
             ## Initialize the countdown timer
@@ -10134,7 +10320,7 @@ https://psappdeploytoolkit.com
 
         ## Label App Name
         $labelAppName.DataBindings.DefaultDataSourceUpdateMode = 0
-        $labelAppName.Font = "$($defaultFont.Name), $($defaultFont.Size + 2), style=Bold"
+        $labelAppName.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size + 3), [System.Drawing.FontStyle]::Bold)
         $labelAppName.Name = 'labelAppName'
         $labelAppName.ClientSize = $defaultControlSize
         $labelAppName.MinimumSize = $defaultControlSize
@@ -10190,36 +10376,60 @@ https://psappdeploytoolkit.com
         $listBoxCloseApps.TabIndex = 3
         $ProcessDescriptions | ForEach-Object { $null = $listboxCloseApps.Items.Add($_) }
 
-        ## Label Defer
-        $labelDefer.DataBindings.DefaultDataSourceUpdateMode = 0
-        $labelDefer.Font = $defaultFont
-        $labelDefer.Name = 'labelDefer'
-        $labelDefer.ClientSize = $defaultControlSize
-        $labelDefer.MinimumSize = $defaultControlSize
-        $labelDefer.MaximumSize = $defaultControlSize
-        $labelDefer.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 0, 0, 5)
-        $labelDefer.Padding = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (10, 0, 10, 0)
-        $labelDefer.TabStop = $false
-        $deferralText = "$configDeferPromptExpiryMessage`r`n"
+        ## Label Defer Expiry Message
+        $labelDeferExpiryMessage.DataBindings.DefaultDataSourceUpdateMode = 0
+        $labelDeferExpiryMessage.Font = $defaultFont
+        $labelDeferExpiryMessage.Name = 'labelDeferExpiryMessage'
+        $labelDeferExpiryMessage.ClientSize = $defaultControlSize
+        $labelDeferExpiryMessage.MinimumSize = $defaultControlSize
+        $labelDeferExpiryMessage.MaximumSize = $defaultControlSize
+        $labelDeferExpiryMessage.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 0, 0, 5)
+        $labelDeferExpiryMessage.Padding = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (10, 0, 10, 0)
+        $labelDeferExpiryMessage.TabStop = $false
+        $labelDeferExpiryMessage.Text = $configDeferPromptExpiryMessage
+        $labelDeferExpiryMessage.TextAlign = 'MiddleCenter'
+        $labelDeferExpiryMessage.AutoSize = $true
 
+        ## Label Defer Deadline
+        $labelDeferDeadline.DataBindings.DefaultDataSourceUpdateMode = 0
+        $labelDeferDeadline.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, $defaultFont.Size, [System.Drawing.FontStyle]::Bold)
+        $labelDeferDeadline.Name = 'labelDeferDeadline'
+        $labelDeferDeadline.ClientSize = $defaultControlSize
+        $labelDeferDeadline.MinimumSize = $defaultControlSize
+        $labelDeferDeadline.MaximumSize = $defaultControlSize
+        $labelDeferDeadline.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 0, 0, 5)
+        $labelDeferDeadline.Padding = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (10, 0, 10, 0)
+        $labelDeferDeadline.TabStop = $false
         If ($deferTimes -ge 0) {
-            $deferralText = "$deferralText `r`n$configDeferPromptRemainingDeferrals $([Int32]$deferTimes + 1)"
+            $labelDeferDeadline.Text = "$configDeferPromptRemainingDeferrals $([Int32]$deferTimes + 1)"
         }
         If ($deferDeadline) {
-            $deferralText = "$deferralText `r`n$configDeferPromptDeadline $deferDeadline"
+            $labelDeferDeadline.Text = "$configDeferPromptDeadline $deferDeadline"
         }
         If (($deferTimes -lt 0) -and (-not $DeferDeadline)) {
-            $deferralText = "$deferralText `r`n$configDeferPromptNoDeadline"
+            $labelDeferDeadline.Text = "$configDeferPromptNoDeadline"
         }
-        $deferralText = "$deferralText `r`n`r`n$configDeferPromptWarningMessage"
-        $labelDefer.Text = $deferralText
-        $labelDefer.TextAlign = 'MiddleCenter'
-        $labelDefer.AutoSize = $true
+        $labelDeferDeadline.TextAlign = 'MiddleCenter'
+        $labelDeferDeadline.AutoSize = $true
+
+        ## Label Defer Expiry Message
+        $labelDeferWarningMessage.DataBindings.DefaultDataSourceUpdateMode = 0
+        $labelDeferWarningMessage.Font = $defaultFont
+        $labelDeferWarningMessage.Name = 'labelDeferWarningMessage'
+        $labelDeferWarningMessage.ClientSize = $defaultControlSize
+        $labelDeferWarningMessage.MinimumSize = $defaultControlSize
+        $labelDeferWarningMessage.MaximumSize = $defaultControlSize
+        $labelDeferWarningMessage.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 0, 0, 5)
+        $labelDeferWarningMessage.Padding = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (10, 0, 10, 0)
+        $labelDeferWarningMessage.TabStop = $false
+        $labelDeferWarningMessage.Text = $configDeferPromptWarningMessage
+        $labelDeferWarningMessage.TextAlign = 'MiddleCenter'
+        $labelDeferWarningMessage.AutoSize = $true
 
         ## Label CountdownMessage
         $labelCountdownMessage.DataBindings.DefaultDataSourceUpdateMode = 0
         $labelCountdownMessage.Name = 'labelCountdownMessage'
-        $labelCountdownMessage.Font = "$($defaultFont.Name), $($defaultFont.Size + 2), style=Regular"
+        $labelCountdownMessage.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size + 3), [System.Drawing.FontStyle]::Bold)
         $labelCountdownMessage.ClientSize = $defaultControlSize
         $labelCountdownMessage.MinimumSize = $defaultControlSize
         $labelCountdownMessage.MaximumSize = $defaultControlSize
@@ -10249,7 +10459,7 @@ https://psappdeploytoolkit.com
         ## Label Countdown
         $labelCountdown.DataBindings.DefaultDataSourceUpdateMode = 0
         $labelCountdown.Name = 'labelCountdown'
-        $labelCountdown.Font = "$($defaultFont.Name), $($defaultFont.Size + 9), style=Bold"
+        $labelCountdown.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size + 9), [System.Drawing.FontStyle]::Bold)
         $labelCountdown.ClientSize = $defaultControlSize
         $labelCountdown.MinimumSize = $defaultControlSize
         $labelCountdown.MaximumSize = $defaultControlSize
@@ -10285,7 +10495,9 @@ https://psappdeploytoolkit.com
             $flowLayoutPanel.Controls.Add($listBoxCloseApps)
         }
         If ($showDefer) {
-            $flowLayoutPanel.Controls.Add($labelDefer)
+            $flowLayoutPanel.Controls.Add($labelDeferExpiryMessage)
+            $flowLayoutPanel.Controls.Add($labelDeferDeadline)
+            $flowLayoutPanel.Controls.Add($labelDeferWarningMessage)
         }
         If ($showCountdown) {
             $flowLayoutPanel.Controls.Add($labelCountdownMessage)
@@ -10295,7 +10507,7 @@ https://psappdeploytoolkit.com
         ## Button Close For Me
         $buttonCloseApps.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonCloseApps.Location = New-Object -TypeName 'System.Drawing.Point' -ArgumentList (14, 4)
-        $buttonCloseApps.Font = $defaultFont
+        $buttonCloseApps.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonCloseApps.Name = 'buttonCloseApps'
         $buttonCloseApps.ClientSize = $buttonSize
         $buttonCloseApps.MinimumSize = $buttonSize
@@ -10317,7 +10529,7 @@ https://psappdeploytoolkit.com
             $buttonDefer.Location = New-Object -TypeName 'System.Drawing.Point' -ArgumentList (160, 4)
         }
         $buttonDefer.Name = 'buttonDefer'
-        $buttonDefer.Font = $defaultFont
+        $buttonDefer.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonDefer.ClientSize = $buttonSize
         $buttonDefer.MinimumSize = $buttonSize
         $buttonDefer.MaximumSize = $buttonSize
@@ -10333,7 +10545,7 @@ https://psappdeploytoolkit.com
         $buttonContinue.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonContinue.Location = New-Object -TypeName 'System.Drawing.Point' -ArgumentList (306, 4)
         $buttonContinue.Name = 'buttonContinue'
-        $buttonContinue.Font = $defaultFont
+        $buttonContinue.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonContinue.ClientSize = $buttonSize
         $buttonContinue.MinimumSize = $buttonSize
         $buttonContinue.MaximumSize = $buttonSize
@@ -10356,7 +10568,7 @@ https://psappdeploytoolkit.com
         ## Button Abort (Hidden)
         $buttonAbort.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonAbort.Name = 'buttonAbort'
-        $buttonAbort.Font = $defaultFont
+        $buttonAbort.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonAbort.ClientSize = New-Object -TypeName 'System.Drawing.Size' -ArgumentList (0, 0)
         $buttonAbort.MinimumSize = New-Object -TypeName 'System.Drawing.Size' -ArgumentList (0, 0)
         $buttonAbort.MaximumSize = New-Object -TypeName 'System.Drawing.Size' -ArgumentList (0, 0)
@@ -10398,7 +10610,7 @@ https://psappdeploytoolkit.com
         $panelButtons.MaximumSize = New-Object -TypeName 'System.Drawing.Size' -ArgumentList (450, 39)
         $panelButtons.AutoSize = $true
         $panelButtons.Padding = $paddingNone
-        $panelButtons.Margin = $paddingNone
+        $panelButtons.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 10, 0, 0)
         If ($showCloseApps) {
             $panelButtons.Controls.Add($buttonCloseApps)
         }
@@ -10755,7 +10967,7 @@ https://psappdeploytoolkit.com
 
         ## Label Time remaining message
         $labelTimeRemaining.DataBindings.DefaultDataSourceUpdateMode = 0
-        $labelTimeRemaining.Font = "$($defaultFont.Name), $($defaultFont.Size + 2), style=Regular"
+        $labelTimeRemaining.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size + 3), [System.Drawing.FontStyle]::Bold)
         $labelTimeRemaining.Name = 'labelTimeRemaining'
         $labelTimeRemaining.ClientSize = $defaultControlSize
         $labelTimeRemaining.MinimumSize = $defaultControlSize
@@ -10770,7 +10982,7 @@ https://psappdeploytoolkit.com
 
         ## Label Countdown
         $labelCountdown.DataBindings.DefaultDataSourceUpdateMode = 0
-        $labelCountdown.Font = "$($defaultFont.Name), $($defaultFont.Size + 9), style=Bold"
+        $labelCountdown.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size + 9), [System.Drawing.FontStyle]::Bold)
         $labelCountdown.Name = 'labelCountdown'
         $labelCountdown.ClientSize = $defaultControlSize
         $labelCountdown.MinimumSize = $defaultControlSize
@@ -10805,7 +11017,7 @@ https://psappdeploytoolkit.com
         $buttonRestartLater.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonRestartLater.Location = New-Object -TypeName 'System.Drawing.Point' -ArgumentList (240, 4)
         $buttonRestartLater.Name = 'buttonRestartLater'
-        $buttonRestartLater.Font = $defaultFont
+        $buttonRestartLater.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonRestartLater.ClientSize = $buttonSize
         $buttonRestartLater.MinimumSize = $buttonSize
         $buttonRestartLater.MaximumSize = $buttonSize
@@ -10821,7 +11033,7 @@ https://psappdeploytoolkit.com
         $buttonRestartNow.DataBindings.DefaultDataSourceUpdateMode = 0
         $buttonRestartNow.Location = New-Object -TypeName 'System.Drawing.Point' -ArgumentList (14, 4)
         $buttonRestartNow.Name = 'buttonRestartNow'
-        $buttonRestartNow.Font = $defaultFont
+        $buttonRestartNow.Font = New-Object -TypeName 'System.Drawing.Font' -ArgumentList ($defaultFont.Name, ($defaultFont.Size - 0.5), [System.Drawing.FontStyle]::Regular)
         $buttonRestartNow.ClientSize = $buttonSize
         $buttonRestartNow.MinimumSize = $buttonSize
         $buttonRestartNow.MaximumSize = $buttonSize
@@ -10858,7 +11070,7 @@ https://psappdeploytoolkit.com
         $panelButtons.MaximumSize = New-Object -TypeName 'System.Drawing.Size' -ArgumentList (450, 39)
         $panelButtons.AutoSize = $true
         $panelButtons.Padding = $paddingNone
-        $panelButtons.Margin = $paddingNone
+        $panelButtons.Margin = New-Object -TypeName 'System.Windows.Forms.Padding' -ArgumentList (0, 10, 0, 0)
         $panelButtons.Controls.Add($buttonRestartNow)
         $panelButtons.Controls.Add($buttonRestartLater)
         ## Add the Buttons Panel to the flowPanel
@@ -12118,6 +12330,7 @@ This is an internal script function and should typically not be called directly.
 
 .LINK
 
+https://psappdeploytoolkit.com
 #>
     [CmdletBinding()]
     Param (
@@ -13630,13 +13843,7 @@ https://psappdeploytoolkit.com
 
                 ## Send the Key sequence
                 If ($Keys) {
-                    [Boolean]$IsWindowModal = If ([PSADT.UiAutomation]::IsWindowEnabled($WindowHandle)) {
-                        $false
-                    }
-                    Else {
-                        $true
-                    }
-                    If ($IsWindowModal) {
+                    If (-not [PSADT.UiAutomation]::IsWindowEnabled($WindowHandle)) {
                         Throw 'Unable to send keys to window because it may be disabled due to a modal dialog being shown.'
                     }
                     Write-Log -Message "Sending key(s) [$Keys] to window title [$($Window.WindowTitle)] with window handle [$WindowHandle]." -Source ${CmdletName}
@@ -14759,7 +14966,7 @@ https://psappdeploytoolkit.com
             }
 
             ## Verify a file with a supported file extension was specified in $StubExePath
-            [String[]]$StubExePathFileExtensions = '.exe', '.vbs', '.cmd', '.ps1', '.js'
+            [String[]]$StubExePathFileExtensions = '.exe', '.vbs', '.cmd', '.bat', '.ps1', '.js'
             [String]$StubExeExt = [IO.Path]::GetExtension($StubExePath)
             If ($StubExePathFileExtensions -notcontains $StubExeExt) {
                 Throw "Unsupported Active Setup StubPath file extension [$StubExeExt]."
@@ -14782,35 +14989,50 @@ https://psappdeploytoolkit.com
             ## Define Active Setup StubPath according to file extension of $StubExePath
             Switch ($StubExeExt) {
                 '.exe' {
-                    [String]$CUStubExePath = "$StubExePath"
+                    [String]$CUStubExePath = $StubExePath
                     [String]$CUArguments = $Arguments
-                    [String]$StubPath = "`"$CUStubExePath`""
+                    if ([string]::IsNullOrEmpty($Arguments)) {
+                        [String]$StubPath = "`"$CUStubExePath`""
+                    } else {
+                        [String]$StubPath = "`"$CUStubExePath`" $CUArguments"
+                    }
                 }
-                '.js' {
-                    [String]$CUStubExePath = "$envWinDir\System32\cscript.exe"
-                    [String]$CUArguments = "//nologo `"$StubExePath`""
+                {$_ -in '.js','.vbs'} {
+                    [String]$CUStubExePath = "$envWinDir\System32\wscript.exe"
+                    if ([string]::IsNullOrEmpty($Arguments)) {
+                        [String]$CUArguments = "//nologo `"$StubExePath`""
+                    }
+                    else {
+                        [String]$CUArguments = "//nologo `"$StubExePath`"  $Arguments"
+                    }
                     [String]$StubPath = "`"$CUStubExePath`" $CUArguments"
                 }
-                '.vbs' {
-                    [String]$CUStubExePath = "$envWinDir\System32\cscript.exe"
-                    [String]$CUArguments = "//nologo `"$StubExePath`""
-                    [String]$StubPath = "`"$CUStubExePath`" $CUArguments"
-                }
-                '.cmd' {
+                {$_ -in '.cmd','.bat'} {
                     [String]$CUStubExePath = "$envWinDir\System32\cmd.exe"
-                    [String]$CUArguments = "/C `"$StubExePath`""
+                    # Prefix any CMD.exe metacharacters ^ or & with ^ to escape them - parentheses only require escaping when there's no space in the path!
+                    if ($StubExePath.Trim() -match '\s') {
+                        $StubExePath = $StubExePath -replace '([&^])', '^$1'
+                    }
+                    else {
+                        $StubExePath = $StubExePath -replace '([()&^])', '^$1'
+                    }
+                    if ([string]::IsNullOrEmpty($Arguments)) {
+                        [String]$CUArguments = "/C `"$StubExePath`""
+                    }
+                    else {
+                        [String]$CUArguments = "/C `"`"$StubExePath`" $Arguments`""
+                    }
                     [String]$StubPath = "`"$CUStubExePath`" $CUArguments"
                 }
                 '.ps1' {
                     [String]$CUStubExePath = "$PSHOME\powershell.exe"
-                    [String]$CUArguments = "-ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -Command `"& {& `\`"$StubExePath`\`"}`""
+                    if ([string]::IsNullOrEmpty($Arguments)) {
+                        [String]$CUArguments = "-ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -File `"$StubExePath`""
+                    }
+                    else {
+                        [String]$CUArguments = "-ExecutionPolicy Bypass -NoProfile -NoLogo -WindowStyle Hidden -File `"$StubExePath`" $Arguments"
+                    }
                     [String]$StubPath = "`"$CUStubExePath`" $CUArguments"
-                }
-            }
-            If ($Arguments) {
-                [String]$StubPath = "$StubPath $Arguments"
-                If ($StubExeExt -ne '.exe') {
-                    [String]$CUArguments = "$CUArguments $Arguments"
                 }
             }
 
@@ -15074,7 +15296,7 @@ Check to see if a service exists.
 
 .DESCRIPTION
 
-Check to see if a service exists (using WMI method because Get-Service will generate ErrorRecord if service doesn't exist).
+Check to see if a service exists.
 
 .PARAMETER Name
 
@@ -15129,7 +15351,7 @@ https://psappdeploytoolkit.com
         [String]$Name,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$ComputerName = $env:ComputerName,
+        [String]$ComputerName = 'localhost',
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
         [Switch]$PassThru,
@@ -15143,29 +15365,25 @@ https://psappdeploytoolkit.com
     }
     Process {
         Try {
-            $ServiceObject = Get-WmiObject -ComputerName $ComputerName -Class 'Win32_Service' -Filter "Name='$Name'" -ErrorAction 'Stop'
-            # If nothing is returned from Win32_Service, check Win32_BaseService
-            If (-not $ServiceObject) {
-                $ServiceObject = Get-WmiObject -ComputerName $ComputerName -Class 'Win32_BaseService' -Filter "Name='$Name'" -ErrorAction 'Stop'
+            If ($PassThru) {
+                $ServiceObject = Get-WmiObject -ComputerName $ComputerName -Class 'Win32_Service' -Filter "Name='$Name'" -ErrorAction 'Stop'
+                # If nothing is returned from Win32_Service, check Win32_BaseService
+                If (-not $ServiceObject) {
+                    $ServiceObject = Get-WmiObject -ComputerName $ComputerName -Class 'Win32_BaseService' -Filter "Name='$Name'" -ErrorAction 'Stop'
+                }
+            }
+            else {
+                # Known issue that WMI method fails in Sandbox, so only use it if -PassThru requested. !! is used to convert to boolean.
+                $ServiceObject = !!(Get-Service -ComputerName $ComputerName -Name $Name -ErrorAction SilentlyContinue)
             }
 
             If ($ServiceObject) {
                 Write-Log -Message "Service [$Name] exists." -Source ${CmdletName}
-                If ($PassThru) {
-                    Write-Output -InputObject ($ServiceObject)
-                }
-                Else {
-                    Write-Output -InputObject ($true)
-                }
+                Write-Output -InputObject $ServiceObject
             }
             Else {
                 Write-Log -Message "Service [$Name] does not exist." -Source ${CmdletName}
-                If ($PassThru) {
-                    Write-Output -InputObject ($ServiceObject)
-                }
-                Else {
-                    Write-Output -InputObject ($false)
-                }
+                Write-Output -InputObject $ServiceObject
             }
         }
         Catch {
@@ -15250,7 +15468,7 @@ https://psappdeploytoolkit.com
         [String]$Name,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$ComputerName = $env:ComputerName,
+        [String]$ComputerName = 'localhost',
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
         [Switch]$SkipServiceExistsTest,
@@ -15419,7 +15637,7 @@ https://psappdeploytoolkit.com
         [String]$Name,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$ComputerName = $env:ComputerName,
+        [String]$ComputerName = 'localhost',
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
         [Switch]$SkipServiceExistsTest,
@@ -15573,7 +15791,7 @@ https://psappdeploytoolkit.com
         [String]$Name,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$ComputerName = $env:ComputerName,
+        [String]$ComputerName = 'localhost',
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
         [Boolean]$ContinueOnError = $true
@@ -15585,11 +15803,7 @@ https://psappdeploytoolkit.com
     Process {
         Try {
             Write-Log -Message "Getting the service [$Name] startup mode." -Source ${CmdletName}
-            [String]$ServiceStartMode = (Get-WmiObject -ComputerName $ComputerName -Class 'Win32_Service' -Filter "Name='$Name'" -Property 'StartMode' -ErrorAction 'Stop').StartMode
-            ## If service start mode is set to 'Auto', change value to 'Automatic' to be consistent with 'Set-ServiceStartMode' function
-            If ($ServiceStartMode -eq 'Auto') {
-                $ServiceStartMode = 'Automatic'
-            }
+            [String]$ServiceStartMode = (Get-Service -ComputerName $ComputerName -Name $Name -ErrorAction 'Stop').StartType
 
             ## If on Windows Vista or higher, check to see if service is set to Automatic (Delayed Start)
             If (($ServiceStartMode -eq 'Automatic') -and (([Version]$envOSVersion).Major -gt 5)) {
@@ -15636,10 +15850,6 @@ Set the service startup mode.
 
 Specify the name of the service.
 
-.PARAMETER ComputerName
-
-Specify the name of the computer. Default is: the local computer.
-
 .PARAMETER StartMode
 
 Specify startup mode for the service. Options: Automatic, Automatic (Delayed Start), Manual, Disabled, Boot, System.
@@ -15677,7 +15887,7 @@ https://psappdeploytoolkit.com
         [String]$Name,
         [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
-        [String]$ComputerName = $env:ComputerName,
+        [String]$ComputerName = 'localhost', # Not used but kept for backwards compatibility
         [Parameter(Mandatory = $true)]
         [ValidateSet('Automatic', 'Automatic (Delayed Start)', 'Manual', 'Disabled', 'Boot', 'System')]
         [String]$StartMode,
@@ -15808,7 +16018,8 @@ https://psappdeploytoolkit.com
     Process {
         Try {
             Write-Log -Message 'Getting session information for all logged on users.' -Source ${CmdletName}
-            Write-Output -InputObject ([PSADT.QueryUser]::GetUserSessionInfo("$env:ComputerName"))
+            ## Changed from $env:ComputerName to [System.Net.Dns]::GetHostName(), as environment variable contains a truncated name which breaks operation in Windows Sandbox
+            Write-Output -InputObject ([PSADT.QueryUser]::GetUserSessionInfo([System.Net.Dns]::GetHostName()))
         }
         Catch {
             Write-Log -Message "Failed to get session information for all logged on users. `r`n$(Resolve-Error)" -Severity 3 -Source ${CmdletName}
@@ -16107,7 +16318,7 @@ This function does not return any objects.
 
     PS C:\>Set-ItemPermission -Path 'C:\Temp' -User 'DOMAIN\John', 'BUILTIN\Utilisateurs' -Permission FullControl -Inheritance ObjectInherit,ContainerInherit
 
-.EXAMPLEan
+.EXAMPLE
 
     Will grant Read permissions to 'John' on 'C:\Temp\pic.png'
 
@@ -16438,8 +16649,10 @@ Function Configure-EdgeExtension {
     This function configures an extension for Microsoft Edge using the ExtensionSettings policy: https://learn.microsoft.com/en-us/deployedge/microsoft-edge-manage-extensions-ref-guide
     This enables Edge Extensions to be installed and managed like applications, enabling extensions to be pushed to specific devices or users alongside existing GPO/Intune extension policies.
     This should not be used in conjunction with Edge Management Service which leverages the same registry key to configure Edge extensions.
-    .PARAMETER ConfigureMode
-    The deployment mode of the extension. Allowed values: Add, Remove
+    .PARAMETER Add
+    Adds an extension configuration
+    .PARAMETER Remove
+    Removes an extension configuration
     .PARAMETER ExtensionID
     The ID of the extension to install.
     .PARAMETER InstallationMode
@@ -16449,38 +16662,44 @@ Function Configure-EdgeExtension {
     .PARAMETER MinimumVersionRequired
     The minimum version of the extension required for installation.
     .EXAMPLE
-    Configure-EdgeExtension -ExtensionID "extensionID" -InstallationMode "Force" -UpdateUrl "https://www.contoso.com/extension"
-
-    Configure-EdgeExtension -ConfigureMode "Remove" -ExtensionID "extensionID"
+    Configure-EdgeExtension -Add -ExtensionID "extensionID" -InstallationMode "force_installed" -UpdateUrl "https://edge.microsoft.com/extensionwebstorebase/v1/crx"
+    .EXAMPLE
+    Configure-EdgeExtension -Remove -ExtensionID "extensionID"
     .NOTES
     This function is provided as a template to install an extension for Microsoft Edge. This should not be used in conjunction with Edge Management Service which leverages the same registry key to configure Edge extensions.
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $true)]
-        [ValidateSet('Add', 'Remove')]
-        [String]$configureMode,
-        [Parameter(Mandatory = $true)]
-        [String]$extensionID,
-        [Parameter(Mandatory = $false)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Add')]
+        [Switch]$Add,
+
+        [Parameter(Mandatory = $true, ParameterSetName = 'Remove')]
+        [Switch]$Remove,
+
+        [Parameter(Mandatory = $true, ParameterSetName = 'Add')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'Remove')]
+        [String]$ExtensionID,
+
+        [Parameter(Mandatory = $true, ParameterSetName = 'Add')]
         [ValidateSet('blocked', 'allowed', 'removed', 'force_installed', 'normal_installed')]
         [String]$InstallationMode,
-        [Parameter(Mandatory = $false)]
-        [String]$UpdateUrl,
-        [Parameter(Mandatory = $false)]
-        [String]$MinimumVersionRequired
-        )
 
-    If ($configureMode -eq 'Add') {
+        [Parameter(Mandatory = $true, ParameterSetName = 'Add')]
+        [String]$UpdateUrl,
+
+        [Parameter(Mandatory = $false, ParameterSetName = 'Add')]
+        [String]$MinimumVersionRequired
+    )
+    If ($Add) {
         If ($MinimumVersionRequired) {
-            Write-Log -Message "Configuring extension with ID [$extensionID] with mode [$($configureMode)] using installation mode [$InstallationMode] and update URL [$UpdateUrl] with minimum version required [$MinimumVersionRequired]." -Severity 1
+            Write-Log -Message "Configuring extension with ID [$extensionID] with mode [Add] using installation mode [$InstallationMode] and update URL [$UpdateUrl] with minimum version required [$MinimumVersionRequired]." -Severity 1
         }
         Else {
-            Write-Log -Message "Configuring extension with ID [$extensionID] with mode [$($configureMode)] using installation mode [$InstallationMode] and update URL [$UpdateUrl]." -Severity 1
+            Write-Log -Message "Configuring extension with ID [$extensionID] with mode [Add] using installation mode [$InstallationMode] and update URL [$UpdateUrl]." -Severity 1
         }
     }
     Else {
-        Write-Log -Message "Configuring extension with ID [$extensionID] with mode [$($configureMode)]." -Severity 1
+        Write-Log -Message "Configuring extension with ID [$extensionID] with mode [Add]." -Severity 1
     }
 
     $regKeyEdgeExtensions = 'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge'
@@ -16495,7 +16714,7 @@ Function Configure-EdgeExtension {
     }
 
     Try {
-        If ($configureMode -ieq 'Remove') {
+        If ($Remove) {
             If ($installedExtensions.$($extensionID)) {
                 # If the deploymentmode is Remove, remove the extension from the list
                 Write-Log -Message "Removing extension with ID [$extensionID]." -Severity 1
@@ -16508,8 +16727,11 @@ Function Configure-EdgeExtension {
             }
         }
         # Configure the extension
-        ElseIf ($configureMode -ieq 'Add') {
+        ElseIf ($Add) {
             Write-Log -Message "Configuring extension ID [$extensionID]." -Severity 1
+            If (!$installedExtensions) {
+                $installedExtensions = @{}
+            }
             If ($MinimumVersionRequired) {
                 $installedExtensions | Add-Member -Name $($extensionID) -Value $(@{ "installation_mode" = $InstallationMode; "update_url" = $UpdateUrl; "minimum_version_required" = $MinimumVersionRequired }) -MemberType NoteProperty -Force
             }
@@ -16612,11 +16834,6 @@ If (-not ([Management.Automation.PSTypeName]'PSADT.UiAutomation').Type) {
 
 ## Dot source ScriptBlock to get system DPI scale factor
 . $GetDisplayScaleFactor
-
-## Dot Source script extensions
-If (Test-Path -LiteralPath "$scriptRoot\$appDeployToolkitDotSourceExtensions" -PathType 'Leaf') {
-    . "$scriptRoot\$appDeployToolkitDotSourceExtensions"
-}
 
 ## If the default Deploy-Application.ps1 hasn't been modified, and the main script was not called by a referring script, check for MSI / MST and modify the install accordingly
 If ((-not $appName) -and (-not $ReferredInstallName)) {
@@ -16758,7 +16975,13 @@ If ($ReferredLogName) {
     [String]$logName = $ReferredLogName
 }
 If (-not $logName) {
-    [String]$logName = $installName + '_' + $appDeployToolkitName + '_' + $deploymentType + '.log'
+    if ($IsAdmin) {
+        [String]$logName = $installName + '_' + $appDeployToolkitName + '_' + $deploymentType + '.log'
+    }
+    else {
+        #  Append the username to the log file name if the toolkit is not running as an administrator, since users do not have the rights to modify files in the ProgramData folder that belong to other users.
+        [String]$logName = $installName + '_' + $appDeployToolkitName + '_' + $deploymentType + '_' + (Remove-InvalidFileNameChars -Name $EnvUserName) + '.log'
+    }
 }
 #  If option to compress logs is selected, then log will be created in temp log folder ($logTempFolder) and then copied to actual log folder ($configToolkitLogDir) after being zipped.
 [String]$logTempFolder = Join-Path -Path $envTemp -ChildPath "${installName}_$deploymentType"
@@ -16814,6 +17037,11 @@ If ($invokingScript) {
 }
 Else {
     Write-Log -Message "Script [$scriptPath] invoked directly" -Source $appDeployToolkitName
+}
+
+## Dot Source script extensions
+If (Test-Path -LiteralPath "$scriptRoot\$appDeployToolkitDotSourceExtensions" -PathType 'Leaf') {
+    . "$scriptRoot\$appDeployToolkitDotSourceExtensions"
 }
 
 ## Evaluate non-default parameters passed to the scripts
@@ -16967,7 +17195,6 @@ If ($usersLoggedOn) {
 
     # Check if OOBE / ESP is running [credit Michael Niehaus]
     $TypeDef = @"
-
 using System;
 using System.Text;
 using System.Collections.Generic;
@@ -16983,18 +17210,13 @@ namespace Api
 }
 "@
 
-Add-Type -TypeDefinition $TypeDef -Language CSharp
+    Add-Type -TypeDefinition $TypeDef -Language CSharp
 
-$IsOOBEComplete = $false
-$hr = [Api.Kernel32]::OOBEComplete([ref] $IsOOBEComplete)
+    $IsOOBEComplete = $false
+    $hr = [Api.Kernel32]::OOBEComplete([ref] $IsOOBEComplete)
 
     If (!($IsOOBEComplete)) {
-        Write-Log -Message "Detected OOBE in progress, changing deployment mode to silent." -Source $appDeployToolkitExtName
-        $deployMode = 'Silent'
-    }
-
-    [Int]$defenderHideSysTray = Get-RegistryKey -Key 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender Security Center\Systray' -Value 'HideSystray'
-    If ($defenderHideSysTray -ne "1" -and ($null -eq (Get-Process -Name SecurityHealthSystray -ErrorAction SilentlyContinue))) {
+        Write-Log -Message "Detected OOBE in progress, changing deployment mode to silent." -Source $appDeployToolkitName
         $deployMode = 'Silent'
     }
 

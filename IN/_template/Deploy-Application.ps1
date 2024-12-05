@@ -1,4 +1,4 @@
-﻿#Requires -Version 5
+#Requires -Version 5
 
 [CmdletBinding()]
 Param (
@@ -20,12 +20,11 @@ Try {
     ## Set the script execution policy for this process
     Try {
         Set-ExecutionPolicy -ExecutionPolicy 'ByPass' -Scope 'Process' -Force -ErrorAction 'Stop'
-    }
-    Catch {
+    } Catch {
     }
 
     ##*===============================================
-    ##* VARIABLE DECLARATION
+    #region VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
     [String]$appVendor = 'HERSTELLER'
@@ -39,10 +38,10 @@ Try {
     [String]$HKCUIntune = "HKCU:\SOFTWARE\Microsoft\Intune"
     [String]$uuid = ""
     [String]$appArch = ''
-    [String]$appLang = ''
+    [String]$appLang = 'EN'
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
-    [String]$appScriptDate = '08/29/2023'
+    [String]$appScriptDate = '12/05/2023'
     [String]$appScriptAuthor = 'Tealk'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
@@ -72,8 +71,8 @@ Try {
 
     ## Variables: Script
     [String]$deployAppScriptFriendlyName = 'Deploy Application'
-    [Version]$deployAppScriptVersion = [Version]'3.9.3'
-    [String]$deployAppScriptDate = '02/05/2023'
+    [Version]$deployAppScriptVersion = [Version]'3.10.2'
+    [String]$deployAppScriptDate = '08/13/2024'
     [Hashtable]$deployAppScriptParameters = $PsBoundParameters
 
     ## Variables: Environment
@@ -115,17 +114,18 @@ Try {
     #endregion
     ##* Do not modify section above
     ##*===============================================
-    ##* END VARIABLE DECLARATION
+    #endregion END VARIABLE DECLARATION
     ##*===============================================
 
     If ($deploymentType -ine 'Uninstall' -and $deploymentType -ine 'Repair') {
         ##*===============================================
-        ##* PRE-INSTALLATION
+        ##* MARK: PRE-INSTALLATION
         ##*===============================================
         [String]$installPhase = 'Pre-Installation'
 
         ## Show Welcome Message, close Internet Explorer if required, allow up to 3 deferrals, verify there is enough disk space to complete the install, and persist the prompt
         Show-InstallationWelcome -CloseApps $CloseApps -MinimizeWindows $false -BlockExecution -AllowDefer -DeferDays 3
+
 
         ## <Perform Pre-Installation tasks here>
         Show-InstallationProgress
@@ -133,7 +133,7 @@ Try {
             New-Item -Path "$HKLMIntune" -Force
         }
         ##*===============================================
-        ##* INSTALLATION
+        ##* MARK: INSTALLATION
         ##*===============================================
         [String]$installPhase = 'Installation'
 
@@ -159,7 +159,7 @@ Try {
         }
 
         ##*===============================================
-        ##* POST-INSTALLATION
+        ##* MARK: POST-INSTALLATION
         ##*===============================================
         [String]$installPhase = 'Post-Installation'
 
@@ -168,7 +168,7 @@ Try {
     }
     ElseIf ($deploymentType -ieq 'Uninstall') {
         ##*===============================================
-        ##* PRE-UNINSTALLATION
+        ##* MARK: PRE-UNINSTALLATION
         ##*===============================================
         [String]$installPhase = 'Pre-Uninstallation'
 
@@ -182,7 +182,7 @@ Try {
 
 
         ##*===============================================
-        ##* UNINSTALLATION
+        ##* MARK: UNINSTALLATION
         ##*===============================================
         [String]$installPhase = 'Uninstallation'
 
@@ -198,7 +198,7 @@ Try {
 
 
         ##*===============================================
-        ##* POST-UNINSTALLATION
+        ##* MARK: POST-UNINSTALLATION
         ##*===============================================
         [String]$installPhase = 'Post-Uninstallation'
 
@@ -207,7 +207,7 @@ Try {
     }
     ElseIf ($deploymentType -ieq 'Repair') {
         ##*===============================================
-        ##* PRE-REPAIR
+        ##* MARK: PRE-REPAIR
         ##*===============================================
         [String]$installPhase = 'Pre-Repair'
 
@@ -220,7 +220,7 @@ Try {
         ## <Perform Pre-Repair tasks here>
 
         ##*===============================================
-        ##* REPAIR
+        ##* MARK: REPAIR
         ##*===============================================
         [String]$installPhase = 'Repair'
 
@@ -234,7 +234,7 @@ Try {
         ## <Perform Repair tasks here>
 
         ##*===============================================
-        ##* POST-REPAIR
+        ##* MARK: POST-REPAIR
         ##*===============================================
         [String]$installPhase = 'Post-Repair'
 
@@ -242,9 +242,6 @@ Try {
 
 
     }
-    ##*===============================================
-    ##* END SCRIPT BODY
-    ##*===============================================
 
     ## Call the Exit-Script function to perform final cleanup operations
     Exit-Script -ExitCode $mainExitCode
