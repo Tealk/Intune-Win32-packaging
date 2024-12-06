@@ -18,7 +18,6 @@ With the start.ps1 you can test the package as well as start the packaging:
 -p to package one program
 -pm to package all programs in a folder
 -c deletes all .intunewin files older than 30 days
--udp Updates the PSAppDeployToolkit files
 ```
 
 ### Setup

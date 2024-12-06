@@ -1,7 +1,7 @@
 # Module manifest for module 'functions'
 
 @{
-  ModuleVersion = '2.1.0'
+  ModuleVersion = '3.0.0'
   Author = 'Tealk'
   Description = 'PowerShell module for packaging applications for Microsoft Intune.'
 
@@ -15,8 +15,7 @@
       'Invoke-TestIntune',
       'Invoke-TestApp',
       'Invoke-TestAppAsSystem',
-      'Remove-OldIntuneWinFiles',
-      'Invoke-PSAppDeployToolkit'
+      'Remove-OldIntuneWinFiles'
   )
 
   # Script module or binary module file associated with this manifest.

@@ -23,7 +23,6 @@ function Show-HelpMessage {
     Write-Host "-p for packaging a program"
     Write-Host "-pm to package all programs"
     Write-Host "-c deletes all .intunewin files older than 30 days"
-    Write-Host "-udp  Updates the PSAppDeployToolkit files"
 }
 
 if ($t) {
@@ -48,9 +47,6 @@ elseif ($h) {
 }
 elseif ($c) {
     Remove-OldIntuneWinFiles
-}
-elseif ($udp) {
-    Invoke-PSAppDeployToolkit
 }
 else {
     Show-HelpMessage

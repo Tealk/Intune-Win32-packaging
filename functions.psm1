@@ -16,7 +16,6 @@ The following functions are included:
 - Invoke-TestIntune: Tests the folder names against the Intune package names
 - Invoke-TestApp: Starts the application packaging in a PowerShell console.
 - Remove-OldIntuneWinFiles: Deletes old IntuneWin files from a directory.
-- Invoke-PSAppDeployToolkit: Updates the PSAppDeployToolkit files.
 
 .PARAMETER initialDirectory
 The optional start path for the folder or file selection in the corresponding functions.
@@ -252,25 +251,6 @@ function Remove-OldIntuneWinFiles {
       catch {
         Write-Host "Error deleting file '$($file.FullName)': $_" -ForegroundColor Red
       }
-    }
-  }
-}
-
-function Invoke-PSAppDeployToolkit {
-  $curDir = Get-Location
-  Write-Host "Select the folder in which the new PSAppDeployToolkit files are located."
-  $NewToolkitPath = Get-Folder "C:\Users\$env:USERNAME\Downloads"
-  Write-Host "Select the folder in which the packages to be updated are located."
-  $DeployPath = Get-Folder "${curDir}\IN"
-  $NewDeployApplication = Join-Path -Path ${NewToolkitPath} -ChildPath "Deploy-Application.exe"
-  $NewAppDeployToolkit = Join-Path -Path ${NewToolkitPath} -ChildPath "AppDeployToolkit"
-  $DeployChildFolder = Get-ChildItem -Path ${DeployPath} -Directory -Recurse
-  foreach (${ChildItem} in ${DeployChildFolder}) {
-    $DeployPfad = Join-Path -Path $ChildItem.FullName -ChildPath "Deploy-Application.exe"
-
-    if (Test-Path ${DeployPfad} -PathType Leaf) {
-      Copy-Item -Path ${NewDeployApplication} -Destination $ChildItem.FullName -Force
-      Copy-Item -Path ${NewAppDeployToolkit} -Destination $ChildItem.FullName -Recurse -Force
     }
   }
 }
