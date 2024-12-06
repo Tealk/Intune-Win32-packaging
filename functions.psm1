@@ -117,6 +117,7 @@ function Invoke-Paketieren {
       Write-Host "Error while compiling ${appFoldername} $_" -ForegroundColor Red
     }
     finally {
+      Write-Host "and was executed successfully." -ForegroundColor Green
       $FilePs1 = "${tempFolderAPP}\${File}.ps1"
       $FileExe = "${tempFolderAPP}\${File}.exe"
     }
