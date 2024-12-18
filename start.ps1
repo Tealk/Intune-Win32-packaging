@@ -18,7 +18,6 @@ function Show-HelpMessage {
     Write-Host "No valid option was specified."
     Write-Host "Available switch:"
     Write-Host "-t for testing with admin rights"
-    Write-Host "-ts for testing with system account"
     Write-Host "-tu Compares package names/folder names with those of Intune"
     Write-Host "-p for packaging a program"
     Write-Host "-pm to package all programs"
@@ -27,9 +26,6 @@ function Show-HelpMessage {
 
 if ($t) {
     Invoke-TestApp
-}
-elseif ($ts) {
-    Invoke-TestAppAsSystem
 }
 elseif ($tu) {
     Invoke-TestIntune

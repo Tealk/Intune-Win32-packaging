@@ -1,10 +1,10 @@
 # Install
 
-ServiceUI.exe -Process:explorer.exe Deploy-Application.exe -DeploymentType Install
+ServiceUI.exe -Process:explorer.exe Invoke-AppDeployToolkit.exe -DeploymentType Install
 
 # Uninstall
 
-ServiceUI.exe -Process:explorer.exe Deploy-Application.exe -DeploymentType Uninstall
+ServiceUI.exe -Process:explorer.exe Invoke-AppDeployToolkit.exe -DeploymentType Uninstall
 
 # Detection
 
@@ -14,3 +14,4 @@ ServiceUI.exe -Process:explorer.exe Deploy-Application.exe -DeploymentType Unins
 **Detection method:** `String comparison` \
 **Operator:** `Equals` \
 **Value:** `$appVersion`
+
