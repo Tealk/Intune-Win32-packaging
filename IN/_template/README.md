@@ -1,10 +1,10 @@
 # Install
 
-ServiceUI.exe -Process:explorer.exe Deploy-Application.exe -DeploymentType Install
+%SystemRoot%\System32\WindowsPowerShell\v1.0\PowerShell.exe -ExecutionPolicy Bypass -NoProfile -File Invoke-ServiceUI.ps1 -DeploymentType Install -AllowRebootPassThru
 
 # Uninstall
 
-ServiceUI.exe -Process:explorer.exe Deploy-Application.exe -DeploymentType Uninstall
+%SystemRoot%\System32\WindowsPowerShell\v1.0\PowerShell.exe -ExecutionPolicy Bypass -NoProfile -File Invoke-ServiceUI.ps1 -DeploymentType Uninstall -AllowRebootPassThru
 
 # Detection
 

@@ -1,15 +1,31 @@
-Intune installation files
-============
+# Intune Win32 Packaging Toolkit
 
-## Requirements
+This PowerShell-based toolkit streamlines the packaging and deployment of Win32 applications via Microsoft Intune. It offers a structured approach for handling input files, utilizing a template system to simplify updates and modifications. By leveraging modular functions and a predefined execution flow, it enhances script management and automation capabilities.
 
-- [Powershell 7.0+](https://github.com/PowerShell/PowerShell)
-- [Microsoft Win32 Content Prep Tool](https://github.com/Microsoft/Microsoft-Win32-Content-Prep-Tool) included
-- [IntuneWin32App](https://github.com/MSEndpointMgr/IntuneWin32App)
+## Setup
 
-Used the [PSAppDeployToolkit](https://github.com/PSAppDeployToolkit/PSAppDeployToolkit), [here](http://allnewandimproved.psappdeploytoolkit.com/functions/) is the documentation of the functions.
+In `functions.psm1`, adjust the `$TenantID` variable to match your Azure tenant ID.
 
-With the start.ps1 you can test the package as well as start the packaging:
+## Installation
+
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/Tealk/Intune-Win32-packaging.git
+   ```
+2. Navigate to the project directory:
+   ```sh
+   cd Intune-Win32-packaging
+   ```
+3. Ensure PowerShell is installed (if not already).
+
+## Usage
+
+Run the script with the following command:
+```sh
+./start.ps1
+```
+
+The following switches are available:
 
 ```
 -t to test with admin rights
@@ -20,45 +36,27 @@ With the start.ps1 you can test the package as well as start the packaging:
 -c deletes all .intunewin files older than 30 days
 ```
 
-### Setup
-
-In `functions.psm1` the variable `$TenantID` must be adjusted.
-
-## Deploy-Application.ps1
-
-Normally only the variables in `Deploy-Application.ps1` need to be adjusted for each packaging/update.
-
-Packaging also uploads the package to Inune if the folder name is the same as the app name in Intune.
-
-## Detection rule
-
-Whether a software is installed or not is detected by registry entries, depending on whether the software is installed as system or user there are 2 paths that can be checked:
-
-```
-HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Intune
-HKEY_CURRENT_USER\SOFTWARE\Microsoft\Intune
+If script execution is blocked, set the permissions with:
+```sh
+Set-ExecutionPolicy Unrestricted -Scope Process
 ```
 
-## Logs
+## Files
 
-Important logs can be found under the following paths:
+- `start.ps1` – Initiates the packaging process.
+- `functions.psm1` – Contains various functions, including the `$TenantID` variable.
+- `functions.psd1` – Manifest for the PowerShell module.
+- `Deploy-Application.ps1` – Script where variables are adjusted for each packaging or update.
 
-```
-C:\Windows\Logs\Software
-C:\ProgramData\Microsoft\IntuneManagementExtension\Logs
-- AgentExecutor.log
-- IntuneManagementExtension.log
-```
+## Program Input
 
-The best way to open these files is to use the [CMTrace.exe] included here.
+Programs should be placed in the `\IN` folder. The files from `\IN\_template` can be used as a base, but only those that need modifications should be copied, as the script uses the template folder as default and overwrites the program-specific files.
 
-### Regkeys
+To update the toolkit, simply place the latest files in `\IN\_template` and adjust the program files if necessary.
 
-With the following command the keys can be displayed:
+## Contributing
 
-```PowerShell
-Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Intune", "HKCU:\SOFTWARE\Microsoft\Intune"| Select-Object _ -ExcludeProperty "PS_"
-```
+If you would like to contribute, please fork the repository, make your changes, and submit a pull request.
 
 ## License
 

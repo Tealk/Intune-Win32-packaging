@@ -1,8 +1,8 @@
 # Module manifest for module 'functions'
 
 @{
-  ModuleVersion = '3.0.0'
-  Author = 'Tealk'
+  ModuleVersion = '2.1.0'
+  Author = 'Daniel Buck'
   Description = 'PowerShell module for packaging applications for Microsoft Intune.'
 
   FunctionsToExport = @(
@@ -14,7 +14,6 @@
       'Invoke-Upload',
       'Invoke-TestIntune',
       'Invoke-TestApp',
-      'Invoke-TestAppAsSystem',
       'Remove-OldIntuneWinFiles'
   )
 

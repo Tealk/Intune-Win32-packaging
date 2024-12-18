@@ -30,6 +30,27 @@ $TenantID = "domain.onmicrosoft.com"
 $ClientID = "00000000-x000-0000-x0x0-00x000000000"
 $ClientSecret = "x0x0x~0xxxxxxxx.0-xxxxZ0xxxxx-0xxxx-xxxx"
 
+function Get-VariableFromScript {
+  param (
+      [string]$filePath,
+      [string]$variableName
+  )
+
+  $content = Get-Content -Path ${filePath}
+
+  $pattern = '^.*(?=' + [regex]::escape(${variableName}) + '\s*=\s*["'']?)'
+
+  $variableLine = ${content} | Where-Object { $_ -match ${pattern} }
+
+  if (${variableLine}) {
+      $variableValue = (${variableLine} -replace '.*=\s*["'']?([^"'']+)["'']?.*', '$1').Trim()
+      return ${variableValue}
+  } else {
+      Write-Host "Variable '${variableName}' nicht gefunden in der Datei."
+      return $null
+  }
+}
+
 function Get-Folder(${initialDirectory}) {
   [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
   $FolderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -64,8 +85,8 @@ function Get-File(${initialDirectory}) {
 
 function Invoke-CompilePackage {
   param (
-      [string]$appName,
-      [string]$appPath
+    [string]$appName,
+    [string]$appPath
   )
 
   $curDir = Get-Location
@@ -94,14 +115,24 @@ function Invoke-Paketieren {
   if (-not $FolderAPP) {
     $FolderAPP = Get-Folder "${curDir}\IN\Standard"
   }
-  $File = "Deploy-Application"
+  $File = "Invoke-AppDeployToolkit"
   $appFoldername = (Split-Path ${FolderAPP} -Leaf)
-  $FilePs1 = "${FolderAPP}\${File}.ps1"
-  $FileExe = "${FolderAPP}\${File}.exe"
+  $FilePs1 = Join-Path -Path "${FolderAPP}" -ChildPath "${File}.ps1"
+  $FileExe = Join-Path -Path "${FolderAPP}" -ChildPath "${File}.exe"
   $FolderOUT = ${FolderAPP} -creplace 'IN', 'OUT'
-  $FileOUT = "${FolderOUT}\${File}.intunewin"
+  $FileOUT = Join-Path -Path "${FolderOUT}" -ChildPath "${File}.intunewin"
   $Version = Get-Date -Format "MM_dd_yy_HH_mm"
-  Import-Module ${FilePs1} 2>&1
+
+  if (Test-Path -Path "${FilePs1}" -PathType Leaf) {
+    $uuid = Get-VariableFromScript -filePath "${FilePs1}" -variableName "uuid"
+    $AppVersion = Get-VariableFromScript -filePath "${FilePs1}" -variableName "AppVersion"
+  }
+  else {
+    Write-Host "${appFoldername}"
+    Write-Host "=========="
+    Write-Host "The ${File}.ps1 file do not exist."
+    return
+  }
 
   if (${FolderAPP} -notmatch 'template') {
     Write-Host "${appFoldername}"
@@ -183,7 +214,6 @@ function Invoke-MSIntuneGraph {
 
 function Invoke-Upload {
   Invoke-MSIntuneGraph
-  Import-Module ${FolderAPP}\Deploy-Application.ps1 2>&1
 
   if ([string]::IsNullOrEmpty(${uuid})) {
     Write-Host "${appFoldername} not available in Intune."
@@ -210,7 +240,7 @@ function Invoke-TestIntune {
   Invoke-MSIntuneGraph
 
   foreach (${FolderAPP} in ${FolderAPPs}) {
-    $FileAPP = "${FolderAPP}\Deploy-Application.ps1"
+    $FileAPP = "${FolderAPP}\Invoke-AppDeployToolkit.ps1"
     if (Get-Item -Path ${FileAPP} -ErrorAction Ignore) {
       $appName = (Split-Path ${FolderAPP} -Leaf)
       $PackName = Get-IntuneWin32App -DisplayName "${appName}"
@@ -226,23 +256,16 @@ function Invoke-TestIntune {
 
 function Invoke-TestApp {
   $folderPath = Get-Folder
-  $deployExePfad = Join-Path -Path ${folderPath} -ChildPath "Deploy-Application.ps1"
+  $deployExePfad = Join-Path -Path ${folderPath} -ChildPath "Invoke-AppDeployToolkit.ps1"
   $command = "${deployExePfad}"
   Start-Process pwsh -ArgumentList "-NoExit", "${command}" -Verb RunAs
-}
-
-function Invoke-TestAppAsSystem {
-  #broken
-  $command = "psexec -s -i cmd.exe"
-  # then execute 'ServiceUI.exe -Process:explorer.exe Deploy-Application.exe'
-  Start-Process cmd.exe -ArgumentList "/K ${command}" -Verb RunAs
 }
 
 function Remove-OldIntuneWinFiles {
   $targetFolder = "C:\_Intune\OUT\"
   $daysToKeep = 30
   $currentDate = Get-Date
-  $intuneWinFiles = Get-ChildItem -Path ${targetFolder} -Recurse -Filter "*.intunewin" | Where-Object { $_.LastWriteTime -lt ($currentDate.AddDays(-$daysToKeep)) -and $_.Name -ne "install.intunewin" -and $_.Name -ne "Deploy-Application.intunewin" }
+  $intuneWinFiles = Get-ChildItem -Path ${targetFolder} -Recurse -Filter "*.intunewin" | Where-Object { $_.LastWriteTime -lt ($currentDate.AddDays(-$daysToKeep)) -and $_.Name -ne "install.intunewin" -and $_.Name -ne "Invoke-AppDeployToolkit.intunewin" }
   if (${intuneWinFiles}) {
     foreach ($file in ${intuneWinFiles}) {
       try {
